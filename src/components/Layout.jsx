@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/numbers', icon: Smartphone, label: 'Números' },
   { to: '/connections', icon: Plug, label: 'Conexiones IA' },
   { to: '/settings', icon: Settings, label: 'Configuración' },
@@ -43,7 +43,7 @@ export default function Layout({ children }) {
             <NavLink
               key={to}
               to={to}
-              end={to === '/'}
+              end={to === '/dashboard'}
               className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
             >
               <Icon size={20} />
@@ -81,7 +81,7 @@ export default function Layout({ children }) {
           <NavLink
             key={to}
             to={to}
-            end={to === '/'}
+            end={to === '/dashboard'}
             className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}
           >
             <Icon size={20} />

@@ -4,6 +4,7 @@ import { ToastProvider } from './components/Toast'
 import PrivateRoute from './components/PrivateRoute'
 import Layout from './components/Layout'
 import AuthForm from './features/auth/AuthForm'
+import LandingPage from './features/landing/LandingPage'
 import Dashboard from './features/dashboard/Dashboard'
 import Numbers from './features/numbers/Numbers'
 import Connections from './features/connections/Connections'
@@ -18,7 +19,8 @@ export default function App() {
         <ToastProvider>
           <Routes>
             <Route path="/auth" element={<AuthForm />} />
-            <Route path="/" element={
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/dashboard" element={
               <PrivateRoute>
                 <Layout><Dashboard /></Layout>
               </PrivateRoute>

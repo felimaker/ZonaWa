@@ -21,7 +21,7 @@ export default function AuthForm() {
     try {
       if (mode === 'login') {
         await signIn({ email: form.email, password: form.password })
-        navigate('/')
+        navigate('/dashboard')
       } else {
         await signUp({ email: form.email, password: form.password, firstName: form.firstName, lastName: form.lastName })
         toast({ message: 'Cuenta creada. Verifica tu correo.', type: 'success' })
