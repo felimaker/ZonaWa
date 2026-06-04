@@ -26,7 +26,11 @@ export async function createInstance(instanceName) {
   const res = await fetch(url, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ instanceName, qrcode: true }),
+    body: JSON.stringify({ 
+      instanceName, 
+      qrcode: true,
+      integration: 'WHATSAPP-BAILEYS' // Requerido en v2
+    }),
   })
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}))
@@ -68,8 +72,8 @@ export async function sendTextMessage(instanceName, number, text) {
     headers,
     body: JSON.stringify({
       number,
-      options: { delay: 1200, presence: 'composing' },
-      textMessage: { text },
+      text, // Estructura plana de v2
+      delay: 1200,
     }),
   })
   if (!res.ok) {
@@ -90,8 +94,9 @@ export async function setWebhook(instanceName, webhookUrl) {
         enabled: true,
         url: webhookUrl,
         byEvents: false,
+        webhookByEvents: false,
         events: ['MESSAGES_UPSERT', 'CONNECTION_UPDATE'],
-      },
+      }
     }),
   })
   if (!res.ok) {
@@ -100,3 +105,15 @@ export async function setWebhook(instanceName, webhookUrl) {
   }
   return res.json()
 }
+
+export async function getConnectionState(instanceName) {
+  const url = getUrl(`/instance/connectionState/${instanceName}`)
+  const headers = getHeaders()
+  const res = await fetch(url, { headers })
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}))
+    throw new Error(errData.message || `Error al obtener el estado de conexión (HTTP ${res.status})`)
+  }
+  return res.json()
+}
+

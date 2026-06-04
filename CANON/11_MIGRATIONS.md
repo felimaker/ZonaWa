@@ -106,3 +106,42 @@ Si se crea una nueva tabla, es obligatorio:
 ### Paso 4: Pruebas y Validación
 - Siempre ejecuta el script de migración primero en un entorno de desarrollo o base de datos de pruebas (staging) antes de aplicarlo en la base de datos de producción.
 - Valida que las consultas de lectura y escritura del frontend sigan funcionando correctamente y no generen errores de base de datos o restricciones rotas.
+
+---
+
+## 5. Historial de Migraciones del Proyecto
+
+### Migración v1.2.0 - Activadores Avanzados y Filtros de Destinatarios
+- **Fecha:** 2026-06-04
+- **Propósito:** Agregar columnas a la tabla `bot_configurations` para permitir al usuario configurar cómo se evalúan las palabras clave de activación y a qué remitentes debe responder el bot.
+- **Script SQL (Ejecutar en Supabase SQL Editor):**
+  ```sql
+  ALTER TABLE public.bot_configurations
+  ADD COLUMN trigger_mode text DEFAULT 'all' CHECK (trigger_mode IN ('all', 'exact', 'contains')) NOT NULL,
+  ADD COLUMN respond_saved_contacts boolean DEFAULT true NOT NULL,
+  ADD COLUMN unsaved_contacts_action text DEFAULT 'respond' CHECK (unsaved_contacts_action IN ('respond', 'ignore', 'fallback')) NOT NULL;
+  ```
+- **Rollback SQL:**
+  ```sql
+  ALTER TABLE public.bot_configurations
+  DROP COLUMN trigger_mode,
+  DROP COLUMN respond_saved_contacts,
+  DROP COLUMN unsaved_contacts_action;
+  ```
+
+### Migración v1.3.0 - Modelo Dinámico de IA, Costos y Reglas de Agente
+- **Fecha:** 2026-06-04
+- **Propósito:** Agregar columnas de modelo dinámico y reglas en la tabla `agents` y optimizar la cantidad máxima de tokens por defecto.
+- **Script SQL (Ejecutar en Supabase SQL Editor):**
+  ```sql
+  ALTER TABLE public.agents ADD COLUMN model text DEFAULT 'gpt-4o-mini' NOT NULL;
+  ALTER TABLE public.agents ADD COLUMN rules jsonb DEFAULT '[]'::jsonb NOT NULL;
+  ALTER TABLE public.agents ALTER COLUMN max_tokens SET DEFAULT 300;
+  ```
+- **Rollback SQL:**
+  ```sql
+  ALTER TABLE public.agents DROP COLUMN model;
+  ALTER TABLE public.agents DROP COLUMN rules;
+  ALTER TABLE public.agents ALTER COLUMN max_tokens SET DEFAULT 1000;
+  ```
+

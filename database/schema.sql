@@ -47,8 +47,10 @@ create table public.agents (
   user_id uuid references public.profiles(id) on delete cascade not null,
   name text not null,
   role_prompt text not null,
+  model text default 'gpt-4o-mini' not null,
+  rules jsonb default '[]'::jsonb not null,
   temperature numeric default 0.7 check (temperature >= 0 and temperature <= 2.0),
-  max_tokens integer default 1000,
+  max_tokens integer default 300,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -60,6 +62,9 @@ create table public.bot_configurations (
   triggers jsonb default '[]'::jsonb,
   handoff_triggers jsonb default '["humano", "asesor", "soporte"]'::jsonb,
   fallback_message text default 'Lo siento, no he podido procesar tu solicitud.',
+  trigger_mode text default 'all' check (trigger_mode in ('all', 'exact', 'contains')) not null,
+  respond_saved_contacts boolean default true not null,
+  unsaved_contacts_action text default 'respond' check (unsaved_contacts_action in ('respond', 'ignore', 'fallback')) not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -98,6 +103,7 @@ create table public.usage_logs (
 create table public.audit_logs (
   id uuid default uuid_generate_v4() primary key,
   user_id uuid references public.profiles(id) on delete cascade not null,
+  number_id uuid references public.whatsapp_numbers(id) on delete cascade,
   event_type text not null,
   details text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null

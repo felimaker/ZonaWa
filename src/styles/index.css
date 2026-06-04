@@ -987,3 +987,170 @@ input[type="range"] { padding: 0; border: none; background: transparent; accent-
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ============================================================
+   WIZARD / ONBOARDING STEPS
+   ============================================================ */
+.wizard-steps {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  position: relative;
+  padding: 0 10px;
+}
+.wizard-steps::before {
+  content: '';
+  position: absolute;
+  top: 15px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  z-index: 1;
+}
+.wizard-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  z-index: 2;
+  position: relative;
+  flex: 1;
+}
+.wizard-step-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #111;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all var(--duration) var(--ease);
+}
+.wizard-step-label {
+  font-size: 0.72rem;
+  color: var(--text-3);
+  font-weight: 500;
+  transition: all var(--duration) var(--ease);
+}
+.wizard-step.active .wizard-step-badge {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.4);
+}
+.wizard-step.active .wizard-step-label {
+  color: var(--text-1);
+  font-weight: 600;
+}
+.wizard-step.completed .wizard-step-badge {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+.wizard-step.completed .wizard-step-label {
+  color: var(--success);
+}
+
+/* ============================================================
+   RADIO CARDS & OPTION CARD GRID
+   ============================================================ */
+.radio-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+.radio-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  position: relative;
+}
+.radio-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+.radio-card.active {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: var(--primary);
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.15);
+}
+.radio-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+.radio-card-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.radio-card-desc {
+  font-size: 0.72rem;
+  color: var(--text-2);
+  line-height: 1.25;
+}
+
+/* ============================================================
+   INLINE CREATION FORM (ONBOARDING STEP 2)
+   ============================================================ */
+.inline-form-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.inline-form-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-1);
+  margin-bottom: 4px;
+}
+
+/* ============================================================
+   VALIDATION ERROR LIST
+   ============================================================ */
+.validation-error-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
+  padding: 0;
+  list-style: none;
+}
+.validation-error-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  color: #fca5a5;
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+.validation-error-item svg {
+  flex-shrink: 0;
+  color: #ef4444;
+  margin-top: 2px;
+}
+
