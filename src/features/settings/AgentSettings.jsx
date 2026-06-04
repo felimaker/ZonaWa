@@ -298,7 +298,7 @@ export default function AgentSettings() {
                 <small className="section-desc" style={{ color: 'var(--text-3)', display: 'block', marginBottom: '10px' }}>
                   Activa pautas de comportamiento específicas para moderar y optimizar la respuesta del bot.
                 </small>
-                <div className="rules-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '10px' }}>
+                <div className="rules-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginTop: '10px' }}>
                   {AVAILABLE_RULES.map(rule => {
                     const isActive = (form.rules || []).includes(rule.key)
                     return (

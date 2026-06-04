@@ -597,7 +597,7 @@ export default function Numbers() {
         .eq('number_id', personalityNumber.id)
       if (botUpdErr) throw botUpdErr
       
-      toast({ message: 'Personalidad de Bot guardada correctamente.', type: 'success' })
+      toast({ message: 'Estilo IA guardado correctamente.', type: 'success' })
       setPersonalityModal(false)
       fetchNumbers()
     } catch (err) {
@@ -1230,6 +1230,206 @@ export default function Numbers() {
     })
   }
 
+
+  if (personalityModal) {
+    return (
+      <div className="page">
+        <div className="page-header" style={{ marginBottom: '16px' }}>
+          <div>
+            <button 
+              className="btn-outline btn-sm" 
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '16px' }}
+              onClick={() => setPersonalityModal(false)}
+            >
+              <ArrowLeft size={14} /> Volver a los Números
+            </button>
+            <h1 className="page-title">Estilo IA - {personalityNumber?.display_name || ''}</h1>
+            <p className="page-subtitle">Configura las reglas de comportamiento, modelo y parámetros para este número</p>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="loading-state"><Loader2 size={32} className="spin" /></div>
+        ) : (
+          <form onSubmit={handleSavePersonality} className="settings-form" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            
+            {/* Selección de Plantilla Guardada */}
+            <div className="glass-card settings-section" style={{ padding: '20px' }}>
+              <h2 className="section-title">Perfil / Plantilla de Estilo IA</h2>
+              <div className="form-group">
+                <select
+                  value={selectedAgentId}
+                  onChange={e => handleSelectAgentTemplate(e.target.value)}
+                  style={{ width: '100%', padding: '10px', borderRadius: '6px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
+                >
+                  <option value="new">-- Crear Nuevo Estilo / Agente --</option>
+                  {savedAgents.map(agent => (
+                    <option key={agent.id} value={agent.id}>{agent.name}</option>
+                  ))}
+                </select>
+                <small style={{ display: 'block', marginTop: '6px', color: 'var(--text-3)' }}>
+                  Elige un agente preconfigurado o crea uno nuevo para este número de WhatsApp.
+                </small>
+              </div>
+            </div>
+
+            {/* Identidad del Agente */}
+            <div className="glass-card settings-section" style={{ padding: '20px' }}>
+              <h2 className="section-title">Identidad del Agente</h2>
+              <div className="form-group">
+                <label>Nombre del Agente</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Agente Comercial, Soporte Técnico"
+                  value={personalityForm.name}
+                  onChange={e => setPersonalityForm({ ...personalityForm, name: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Instrucciones de Comportamiento (System Prompt)</label>
+                <textarea
+                  rows={5}
+                  placeholder="Eres un agente virtual..."
+                  value={personalityForm.role_prompt}
+                  onChange={e => setPersonalityForm({ ...personalityForm, role_prompt: e.target.value })}
+                  required
+                />
+              </div>
+              
+              {personalityConfig?.connection_id && (
+                <div className="form-group">
+                  <label>Modelo de IA</label>
+                  <select
+                    value={personalityForm.model}
+                    onChange={e => setPersonalityForm({ ...personalityForm, model: e.target.value })}
+                    required
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
+                  >
+                    {(() => {
+                      const conn = connections.find(c => c.id === personalityConfig.connection_id)
+                      const provider = conn?.provider || 'openai'
+                      const models = PROVIDER_MODELS[provider] || []
+                      return models.map(m => (
+                        <option key={m.id} value={m.id}>{m.label}</option>
+                      ))
+                    })()}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Reglas de Comportamiento */}
+            <div className="glass-card settings-section" style={{ padding: '20px' }}>
+              <h2 className="section-title">Reglas del Bot (Instrucciones Rápidas)</h2>
+              <small className="section-desc" style={{ color: 'var(--text-3)', display: 'block', marginBottom: '10px' }}>
+                Define las pautas que moldean el comportamiento del bot en el chat.
+              </small>
+              <div className="rules-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px', marginTop: '10px' }}>
+                {AVAILABLE_RULES.map(rule => {
+                  const isActive = (personalityForm.rules || []).includes(rule.key)
+                  return (
+                    <div 
+                      key={rule.key} 
+                      onClick={() => {
+                        setPersonalityForm(prev => {
+                          const currentRules = prev.rules || []
+                          const nextRules = currentRules.includes(rule.key)
+                            ? currentRules.filter(r => r !== rule.key)
+                            : [...currentRules, rule.key]
+                          return { ...prev, rules: nextRules }
+                        })
+                      }}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        padding: '12px',
+                        background: isActive ? 'rgba(59, 130, 246, 0.08)' : 'rgba(255, 255, 255, 0.01)',
+                        border: isActive ? '1px solid var(--primary)' : '1px solid var(--border)',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                      }}
+                      className="rule-card"
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <strong style={{ fontSize: '0.85rem', color: isActive ? 'var(--primary-light)' : 'var(--text-1)' }}>{rule.label}</strong>
+                        <div className={`toggle-switch ${isActive ? 'on' : ''}`} style={{ transform: 'scale(0.8)', pointerEvents: 'none' }}>
+                          <span className="toggle-knob" />
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-3)', lineHeight: '1.2' }}>{rule.desc}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Parámetros */}
+            <div className="glass-card settings-section" style={{ padding: '20px' }}>
+              <h2 className="section-title">Parámetros del Modelo</h2>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Temperatura: <strong>{personalityForm.temperature}</strong></label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1.2"
+                    step="0.1"
+                    value={personalityForm.temperature}
+                    onChange={e => setPersonalityForm({ ...personalityForm, temperature: e.target.value })}
+                    style={{ accentColor: 'var(--primary)', cursor: 'pointer' }}
+                  />
+                  <div className="range-labels"><span>Preciso</span><span>Creativo</span></div>
+                </div>
+                <div className="form-group">
+                  <label>Tokens Máximos</label>
+                  <input
+                    type="number"
+                    min="100"
+                    max="4000"
+                    value={personalityForm.max_tokens}
+                    onChange={e => setPersonalityForm({ ...personalityForm, max_tokens: e.target.value })}
+                  />
+                  <small style={{ color: 'var(--text-3)', fontSize: '0.72rem', display: 'block', marginTop: '2px' }}>
+                    💡 Configuración recomendada: 300–500 tokens para reducir costos.
+                  </small>
+                </div>
+              </div>
+            </div>
+
+            {/* Guardar como nueva plantilla */}
+            {selectedAgentId !== 'new' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                <input
+                  type="checkbox"
+                  id="chk-save-as-new"
+                  checked={saveAsNewTemplate}
+                  onChange={e => setSaveAsNewTemplate(e.target.checked)}
+                  style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                />
+                <label htmlFor="chk-save-as-new" style={{ fontSize: '0.85rem', color: 'var(--text-1)', cursor: 'pointer', margin: 0 }}>
+                  Guardar como una nueva plantilla de Estilo IA (no sobrescribir la original)
+                </label>
+              </div>
+            )}
+
+            {/* Botones de Acción */}
+            <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+              <button type="submit" className="btn-primary" style={{ flex: 1 }} disabled={savingPersonality}>
+                {savingPersonality ? <><Loader2 size={16} className="spin" /> Guardando…</> : <><Save size={16} /> Guardar Configuración de Estilo</>}
+              </button>
+              <button type="button" className="btn-outline" style={{ flex: 1 }} onClick={() => setPersonalityModal(false)}>
+                Cancelar
+              </button>
+            </div>
+
+          </form>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="page">
       <div className="page-header">
@@ -1367,9 +1567,9 @@ export default function Numbers() {
                         </button>
                       )}
                       
-                      {/* Botón de Rol/Personalidad de IA, visible siempre que esté configurado */}
+                      {/* Botón de Estilo de IA, visible siempre que esté configurado */}
                       <button className="btn-outline btn-sm" style={{ marginLeft: '6px' }} onClick={() => openPersonalityModal(number)}>
-                        <Sparkles size={13} style={{ color: 'var(--warning)' }} /> Rol IA
+                        <Sparkles size={13} style={{ color: 'var(--warning)' }} /> Estilo IA
                       </button>
                     </>
                   )}
@@ -2245,182 +2445,6 @@ export default function Numbers() {
         )}
       </Modal>
 
-      {/* Modal: Configurar Rol y Personalidad del Agente */}
-      <Modal open={personalityModal} onClose={() => setPersonalityModal(false)} title={`Personalidad del Bot: ${personalityNumber?.display_name || ''}`} size="md">
-        {loading ? (
-          <div className="loading-state" style={{ padding: '40px 0' }}><Loader2 size={32} className="spin" /></div>
-        ) : (
-          <form onSubmit={handleSavePersonality} className="modal-form" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            
-            {/* Selección de Plantilla Guardada */}
-            <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: '8px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.8rem', fontWeight: '600' }}>Perfil / Plantilla de Personalidad</label>
-              <select
-                value={selectedAgentId}
-                onChange={e => handleSelectAgentTemplate(e.target.value)}
-                style={{ width: '100%', padding: '8px', borderRadius: '6px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
-              >
-                <option value="new">-- Crear Nueva Personalidad / Agente --</option>
-                {savedAgents.map(agent => (
-                  <option key={agent.id} value={agent.id}>{agent.name}</option>
-                ))}
-              </select>
-              <small style={{ display: 'block', marginTop: '6px', color: 'var(--text-3)' }}>
-                Elige un agente preconfigurado o crea uno nuevo para este número de WhatsApp.
-              </small>
-            </div>
-
-            {/* Identidad del Agente */}
-            <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: '8px' }}>
-              <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-1)' }}>Identidad del Agente</h4>
-              <div className="form-group">
-                <label>Nombre del Agente</label>
-                <input
-                  type="text"
-                  placeholder="Ej: Agente Comercial, Soporte Técnico"
-                  value={personalityForm.name}
-                  onChange={e => setPersonalityForm({ ...personalityForm, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label>Prompt de Rol (System Prompt)</label>
-                <textarea
-                  rows={5}
-                  placeholder="Eres un agente virtual..."
-                  value={personalityForm.role_prompt}
-                  onChange={e => setPersonalityForm({ ...personalityForm, role_prompt: e.target.value })}
-                  required
-                />
-              </div>
-              
-              {personalityConfig?.connection_id && (
-                <div className="form-group">
-                  <label>Modelo de IA</label>
-                  <select
-                    value={personalityForm.model}
-                    onChange={e => setPersonalityForm({ ...personalityForm, model: e.target.value })}
-                    required
-                  >
-                    {(() => {
-                      const conn = connections.find(c => c.id === personalityConfig.connection_id)
-                      const provider = conn?.provider || 'openai'
-                      const models = PROVIDER_MODELS[provider] || []
-                      return models.map(m => (
-                        <option key={m.id} value={m.id}>{m.label}</option>
-                      ))
-                    })()}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            {/* Reglas de Comportamiento */}
-            <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: '8px' }}>
-              <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-1)' }}>Reglas del Bot (Instrucciones Rápidas)</h4>
-              <small style={{ color: 'var(--text-3)', display: 'block', marginBottom: '10px', fontSize: '0.72rem' }}>
-                Define las pautas que moldean el comportamiento del bot en el chat.
-              </small>
-              <div className="rules-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '8px' }}>
-                {AVAILABLE_RULES.map(rule => {
-                  const isActive = (personalityForm.rules || []).includes(rule.key)
-                  return (
-                    <div 
-                      key={rule.key} 
-                      onClick={() => {
-                        setPersonalityForm(prev => {
-                          const currentRules = prev.rules || []
-                          const nextRules = currentRules.includes(rule.key)
-                            ? currentRules.filter(r => r !== rule.key)
-                            : [...currentRules, rule.key]
-                          return { ...prev, rules: nextRules }
-                        })
-                      }}
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        padding: '10px',
-                        background: isActive ? 'rgba(59, 130, 246, 0.08)' : 'rgba(255, 255, 255, 0.01)',
-                        border: isActive ? '1px solid var(--primary)' : '1px solid var(--border)',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                      }}
-                      className="rule-card"
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                        <strong style={{ fontSize: '0.8rem', color: isActive ? 'var(--primary-light)' : 'var(--text-1)' }}>{rule.label}</strong>
-                        <div className={`toggle-switch ${isActive ? 'on' : ''}`} style={{ transform: 'scale(0.75)', pointerEvents: 'none' }}>
-                          <span className="toggle-knob" />
-                        </div>
-                      </div>
-                      <span style={{ fontSize: '0.68rem', color: 'var(--text-3)', lineHeight: '1.2' }}>{rule.desc}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Parámetros */}
-            <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: '8px' }}>
-              <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-1)' }}>Parámetros del Modelo</h4>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Temperatura: <strong>{personalityForm.temperature}</strong></label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1.2"
-                    step="0.1"
-                    value={personalityForm.temperature}
-                    onChange={e => setPersonalityForm({ ...personalityForm, temperature: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Tokens Máximos</label>
-                  <input
-                    type="number"
-                    min="100"
-                    max="4000"
-                    value={personalityForm.max_tokens}
-                    onChange={e => setPersonalityForm({ ...personalityForm, max_tokens: e.target.value })}
-                  />
-                  <small style={{ color: 'var(--text-3)', fontSize: '0.68rem', display: 'block', marginTop: '2px' }}>
-                    💡 Configuración recomendada: 300–500 tokens para reducir costos.
-                  </small>
-                </div>
-              </div>
-            </div>
-
-            {/* Guardar como nueva plantilla */}
-            {selectedAgentId !== 'new' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 4px' }}>
-                <input
-                  type="checkbox"
-                  id="chk-save-as-new"
-                  checked={saveAsNewTemplate}
-                  onChange={e => setSaveAsNewTemplate(e.target.checked)}
-                  style={{ cursor: 'pointer' }}
-                />
-                <label htmlFor="chk-save-as-new" style={{ fontSize: '0.78rem', color: 'var(--text-1)', cursor: 'pointer', margin: 0 }}>
-                  Guardar como una nueva plantilla de personalidad (no sobrescribir la original)
-                </label>
-              </div>
-            )}
-
-            {/* Botones de Acción */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '8px' }}>
-              <button type="button" className="btn-outline" onClick={() => setPersonalityModal(false)}>
-                Cancelar
-              </button>
-              <button type="submit" className="btn-primary" disabled={savingPersonality}>
-                {savingPersonality ? <><Loader2 size={14} className="spin" /> Guardando…</> : <><Save size={14} /> Guardar Configuración del Bot</>}
-              </button>
-            </div>
-
-          </form>
-        )}
-      </Modal>
     </div>
   )
 }

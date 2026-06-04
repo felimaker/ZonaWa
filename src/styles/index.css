@@ -650,7 +650,18 @@ label {
    SETTINGS
 ══════════════════════════════════════════ */
 .settings-layout { display: grid; grid-template-columns: 260px 1fr; gap: 20px; align-items: start; }
-.settings-sidebar { padding: 20px; display: flex; flex-direction: column; gap: 6px; position: sticky; top: 24px; }
+.settings-sidebar {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: sticky;
+  top: 24px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
 .sidebar-section-title { font-size: 0.78rem; color: var(--text-2); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
 .number-select-btn {
   display: flex; flex-direction: column; align-items: flex-start;
@@ -906,9 +917,28 @@ input[type="range"] { padding: 0; border: none; background: transparent; accent-
 
 @media (max-width: 1024px) {
   .dashboard-grid { grid-template-columns: 1fr; }
-  .settings-layout { grid-template-columns: 1fr; }
+  .settings-layout { grid-template-columns: 1fr; gap: 16px; }
+  .settings-sidebar {
+    position: relative;
+    top: 0;
+    max-height: 200px;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
   .profile-layout { grid-template-columns: 1fr; }
-  .chat-layout { grid-template-columns: 1fr; height: auto; }
+  .chat-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+    gap: 16px;
+  }
+  .chat-list {
+    max-height: 220px;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+  .chat-messages {
+    height: 500px;
+  }
 }
 @media (max-width: 768px) {
   .sidebar { width: var(--sidebar-collapsed); }
