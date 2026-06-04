@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 - Portal Inexistente | Zonadinero</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'bg-main': '#070b14',
+                        'bg-surface': '#0d1117',
+                        'text-1': '#f0f2f8',
+                        'text-2': '#8b92a9',
+                        'text-3': '#4b5575',
+                        'primary': '#6366f1',
+                        'success': '#10b981',
+                        'info': '#3b82f6',
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                        display: ['Syne', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            background-color: #070b14;
+            color: #f0f2f8;
+            overflow: hidden;
+        }
+        
+        .glass-card {
+            background: rgba(13, 18, 30, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        .glow-effect {
+            box-shadow: 0 0 80px -10px rgba(99, 102, 241, 0.35);
+        }
+        
+        /* Animación de pulso orbital */
+        @keyframes orbit {
+            0% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(180deg) scale(1.05); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+        
+        .animated-ring {
+            animation: orbit 10s linear infinite;
+        }
+    </style>
+</head>
+
+<body class="font-sans antialiased h-full flex items-center justify-center relative px-4">
+    
+    <!-- Brillo de fondo decorativo -->
+    <div class="absolute w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] pointer-events-none top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0"></div>
+    
+    <!-- Contenido del Error 404 -->
+    <div class="max-w-md w-full glass-card rounded-3xl p-8 text-center relative z-10 glow-effect border border-white/10 space-y-8">
+        
+        <!-- Icono Holográfico con Anillo Animado -->
+        <div class="relative w-28 h-28 mx-auto flex items-center justify-center">
+            <!-- Anillo externo animado -->
+            <div class="absolute inset-0 rounded-full border-2 border-dashed border-primary/30 animated-ring"></div>
+            <!-- Círculo interno con gradiente -->
+            <div class="w-20 h-20 bg-gradient-to-tr from-primary via-info to-success rounded-full flex items-center justify-center shadow-lg">
+                <div class="w-[76px] h-[76px] bg-bg-main rounded-full flex items-center justify-center">
+                    <i class="fa-solid fa-triangle-exclamation text-primary text-3xl"></i>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Texto explicativo -->
+        <div class="space-y-3">
+            <span class="text-xs text-primary font-mono tracking-[0.3em] uppercase block font-bold">ERROR DE ACCESO [404]</span>
+            <h1 class="font-display text-3xl font-extrabold text-text-1">Portal No Encontrado</h1>
+            <p class="text-sm text-text-2 font-light leading-relaxed">
+                El vector de datos que intentas solicitar no se encuentra disponible o ha sido reestructurado en el ecosistema.
+            </p>
+        </div>
+        
+        <!-- Línea divisoria de telemetría -->
+        <div class="border-t border-white/5 pt-6 flex justify-around text-[10px] text-text-3 font-mono">
+            <span>STATUS: INVALID_PATH</span>
+            <span>PORTAL: ZONADINERO</span>
+        </div>
+        
+        <!-- Botón de regreso principal -->
+        <div class="pt-2">
+            <a href="/" 
+                class="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-info text-text-1 font-extrabold text-xs uppercase tracking-wider py-4 rounded-xl hover:opacity-90 transition-all duration-300 shadow-lg shadow-primary/20">
+                <i class="fa-solid fa-house text-sm"></i> Regresar al Inicio
+            </a>
+        </div>
+        
+    </div>
+    
+</body>
+</html>
