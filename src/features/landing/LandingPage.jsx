@@ -22,8 +22,16 @@ export default function LandingPage() {
     <iframe
       src="/landing.html"
       title="Zonadinero Landing Page"
-      className="w-screen h-screen border-none block"
-      style={{ overflow: 'hidden' }}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        border: 'none',
+        overflow: 'hidden',
+        zIndex: 99999
+      }}
     />
   )
 }
