@@ -11,6 +11,7 @@ import Connections from './features/connections/Connections'
 import AgentSettings from './features/settings/AgentSettings'
 import Chats from './features/chats/Chats'
 import Profile from './features/profile/Profile'
+import Styles from './features/styles/Styles'
 
 export default function App() {
   return (
@@ -33,6 +34,11 @@ export default function App() {
             <Route path="/connections" element={
               <PrivateRoute>
                 <Layout><Connections /></Layout>
+              </PrivateRoute>
+            } />
+            <Route path="/styles" element={
+              <PrivateRoute>
+                <Layout><Styles /></Layout>
               </PrivateRoute>
             } />
             <Route path="/settings" element={

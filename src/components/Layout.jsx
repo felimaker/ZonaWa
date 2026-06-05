@@ -3,13 +3,14 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Smartphone, Plug, Settings, User,
-  MessageSquare, LogOut, Bot, ChevronLeft, ChevronRight, Menu
+  MessageSquare, LogOut, Bot, ChevronLeft, ChevronRight, Menu, Sparkles
 } from 'lucide-react'
 
 const NAV_ITEMS = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/numbers', icon: Smartphone, label: 'Números' },
   { to: '/connections', icon: Plug, label: 'Conexiones IA' },
+  { to: '/styles', icon: Sparkles, label: 'Estilos IA' },
   { to: '/settings', icon: Settings, label: 'Configuración' },
   { to: '/chats', icon: MessageSquare, label: 'Chats' },
   { to: '/profile', icon: User, label: 'Perfil' },
