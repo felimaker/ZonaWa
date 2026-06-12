@@ -3,7 +3,8 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Smartphone, Plug, Settings, User,
-  MessageSquare, LogOut, Bot, ChevronLeft, ChevronRight, Menu, Sparkles
+  MessageSquare, LogOut, Bot, ChevronLeft, ChevronRight, Menu, Sparkles,
+  BarChart3, HelpCircle
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -11,8 +12,10 @@ const NAV_ITEMS = [
   { to: '/numbers', icon: Smartphone, label: 'Números' },
   { to: '/connections', icon: Plug, label: 'Conexiones IA' },
   { to: '/styles', icon: Sparkles, label: 'Estilos IA' },
-  { to: '/settings', icon: Settings, label: 'Configuración' },
   { to: '/chats', icon: MessageSquare, label: 'Chats' },
+  { to: '/consumption', icon: BarChart3, label: 'Consumo' },
+  { to: '/help', icon: HelpCircle, label: 'Ayuda' },
+  { to: '/settings', icon: Settings, label: 'Configuración' },
   { to: '/profile', icon: User, label: 'Perfil' },
 ]
 

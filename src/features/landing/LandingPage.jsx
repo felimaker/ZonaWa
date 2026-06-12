@@ -21,7 +21,7 @@ export default function LandingPage() {
   return (
     <iframe
       src="/landing.html"
-      title="Zonadinero Landing Page"
+      title="ZonaWa Landing Page"
       style={{
         position: 'fixed',
         top: 0,

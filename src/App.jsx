@@ -12,6 +12,8 @@ import AgentSettings from './features/settings/AgentSettings'
 import Chats from './features/chats/Chats'
 import Profile from './features/profile/Profile'
 import Styles from './features/styles/Styles'
+import Consumption from './features/consumption/Consumption'
+import Help from './features/help/Help'
 
 export default function App() {
   return (
@@ -49,6 +51,16 @@ export default function App() {
             <Route path="/chats" element={
               <PrivateRoute>
                 <Layout><Chats /></Layout>
+              </PrivateRoute>
+            } />
+            <Route path="/consumption" element={
+              <PrivateRoute>
+                <Layout><Consumption /></Layout>
+              </PrivateRoute>
+            } />
+            <Route path="/help" element={
+              <PrivateRoute>
+                <Layout><Help /></Layout>
               </PrivateRoute>
             } />
             <Route path="/profile" element={

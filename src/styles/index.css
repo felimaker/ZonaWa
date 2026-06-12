@@ -1184,3 +1184,381 @@ input[type="range"] { padding: 0; border: none; background: transparent; accent-
   margin-top: 2px;
 }
 
+/* ============================================================
+   USAGE TABLE & CONSUMPTION STYLES
+   ============================================================ */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 10px;
+}
+
+.usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+.usage-table th {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-2);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.usage-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-1);
+}
+
+.usage-table tr:hover td {
+  background: var(--bg-hover);
+}
+
+.font-mono {
+  font-family: monospace;
+}
+
+.text-accent {
+  color: var(--primary);
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+.text-xs {
+  font-size: 0.75rem;
+}
+
+.status-pill.active {
+  background: var(--success-dim);
+  color: var(--success);
+}
+
+.status-pill.inactive {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-3);
+}
+
+/* ============================================================
+   CONSUMPTION PAGE SPECIFICS
+   ============================================================ */
+.consumption-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.consumption-model-rates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.model-rate-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.model-rate-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.model-rate-name {
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.model-rate-provider {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.provider-openai { background: rgba(16, 163, 127, 0.15); color: #10a37f; }
+.provider-anthropic { background: rgba(217, 119, 6, 0.15); color: #d97706; }
+.provider-google { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.provider-groq { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+.model-rate-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--text-2);
+}
+
+.model-rate-val {
+  font-family: monospace;
+  color: var(--text-1);
+}
+
+.recommendations-card {
+  margin-top: 24px;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  background: rgba(16, 185, 129, 0.02);
+}
+
+.recommendations-card:hover {
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.recommendations-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.recommendation-item {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  display: flex;
+  gap: 12px;
+}
+
+.recommendation-icon {
+  color: var(--success);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.recommendation-body h4 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-1);
+  margin-bottom: 4px;
+}
+
+.recommendation-body p {
+  font-size: 0.78rem;
+  color: var(--text-2);
+  line-height: 1.4;
+}
+
+/* ============================================================
+   HELP / ACCORDION STYLES
+   ============================================================ */
+.help-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.help-section-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-1);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.help-accordions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.help-accordion-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  overflow: hidden;
+  transition: all var(--duration) var(--ease);
+}
+
+.help-accordion-item:hover {
+  border-color: var(--border-hover);
+}
+
+.help-accordion-header {
+  width: 100%;
+  background: transparent;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  text-align: left;
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.help-accordion-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.help-accordion-icon {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.help-accordion-chevron {
+  color: var(--text-2);
+  transition: transform var(--duration) var(--ease);
+}
+
+.help-accordion-item.open .help-accordion-chevron {
+  transform: rotate(180deg);
+  color: var(--primary);
+}
+
+.help-accordion-content {
+  border-top: 1px solid var(--border);
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.15);
+  animation: slideDown 0.2s var(--ease);
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.help-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.help-step-item {
+  display: flex;
+  gap: 16px;
+}
+
+.help-step-number {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--primary-dim);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  border: 1px solid rgba(99,102,241,0.2);
+}
+
+.help-step-body {
+  flex: 1;
+}
+
+.help-step-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-1);
+  margin-bottom: 4px;
+}
+
+.help-step-text {
+  font-size: 0.82rem;
+  color: var(--text-2);
+  line-height: 1.4;
+}
+
+.help-step-text a {
+  color: var(--primary);
+  text-decoration: underline;
+  transition: color var(--duration) var(--ease);
+}
+
+.help-step-text a:hover {
+  color: #818cf8;
+}
+
+.provider-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.provider-info-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+}
+
+.provider-info-card h5 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.provider-info-card p {
+  font-size: 0.75rem;
+  color: var(--text-2);
+  line-height: 1.35;
+}
+
+.help-faq {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.faq-item h4 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-1);
+  margin-bottom: 4px;
+}
+
+.faq-item p {
+  font-size: 0.8rem;
+  color: var(--text-2);
+  line-height: 1.4;
+}
+
+/* ============================================================
+   MANUAL AGENT CHAT BUBBLES
+   ============================================================ */
+.message-bubble.agent {
+  flex-direction: row-reverse;
+}
+
+.message-bubble.agent .msg-content p {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 12px 4px 12px 12px;
+  text-align: right;
+}
+
+.message-bubble.agent .msg-time {
+  text-align: right;
+}
+
+

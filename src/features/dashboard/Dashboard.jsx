@@ -7,13 +7,66 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 
 export default function Dashboard() {
   const { user, profile } = useAuth()
-  const [stats, setStats] = useState({ cost: 0, messages: 0, activeBots: 0, latency: 0 })
+  const [stats, setStats] = useState({ cost: 0, messages: 0, activeBots: 0 })
   const [chartData, setChartData] = useState([])
   const [activity, setActivity] = useState([])
+  const [numbersUsage, setNumbersUsage] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (user) { fetchStats(); fetchChart(); fetchActivity() }
+    if (!user) return
+
+    fetchStats()
+    fetchChart()
+    fetchActivity()
+    fetchNumbersUsage()
+
+    // Realtime channel for usage_logs inserts
+    const channelUsage = supabase
+      .channel('dashboard-usage-realtime')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'usage_logs',
+        filter: `user_id=eq.${user.id}`
+      }, () => {
+        fetchStats()
+        fetchChart()
+        fetchNumbersUsage()
+      })
+      .subscribe()
+
+    // Realtime channel for whatsapp_numbers modifications
+    const channelNumbers = supabase
+      .channel('dashboard-numbers-realtime')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'whatsapp_numbers',
+        filter: `user_id=eq.${user.id}`
+      }, () => {
+        fetchStats()
+        fetchNumbersUsage()
+      })
+      .subscribe()
+
+    // Realtime channel for recent activities
+    const channelActivity = supabase
+      .channel('dashboard-activity-realtime')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages'
+      }, () => {
+        fetchActivity()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channelUsage)
+      supabase.removeChannel(channelNumbers)
+      supabase.removeChannel(channelActivity)
+    }
   }, [user])
 
   async function fetchStats() {
@@ -40,13 +93,16 @@ export default function Dashboard() {
   async function fetchChart() {
     const days = []
     for (let i = 6; i >= 0; i--) {
-      const d = new Date(); d.setDate(d.getDate() - i)
+      const d = new Date()
+      d.setDate(d.getDate() - i)
       const start = new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString()
       const end = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).toISOString()
+      
       const { data } = await supabase.from('usage_logs')
         .select('estimated_cost, tokens_prompt, tokens_completion')
         .eq('user_id', user.id)
         .gte('created_at', start).lt('created_at', end)
+        
       const cost = (data || []).reduce((s, r) => s + (r.estimated_cost || 0), 0)
       const tokens = (data || []).reduce((s, r) => s + (r.tokens_prompt || 0) + (r.tokens_completion || 0), 0)
       days.push({ day: d.toLocaleDateString('es', { weekday: 'short' }), cost: parseFloat(cost.toFixed(4)), tokens })
@@ -62,6 +118,37 @@ export default function Dashboard() {
       .order('created_at', { ascending: false })
       .limit(8)
     setActivity(data || [])
+  }
+
+  async function fetchNumbersUsage() {
+    const { data: numbersData } = await supabase
+      .from('whatsapp_numbers')
+      .select('id, display_name, phone_number, bot_enabled')
+      .eq('user_id', user.id)
+
+    if (!numbersData) return
+
+    const { data: logsData } = await supabase
+      .from('usage_logs')
+      .select('number_id, tokens_prompt, tokens_completion, estimated_cost')
+      .eq('user_id', user.id)
+
+    const aggregated = (numbersData || []).map(num => {
+      const numLogs = (logsData || []).filter(l => l.number_id === num.id)
+      const prompt = numLogs.reduce((sum, l) => sum + (l.tokens_prompt || 0), 0)
+      const completion = numLogs.reduce((sum, l) => sum + (l.tokens_completion || 0), 0)
+      const cost = numLogs.reduce((sum, l) => sum + (l.estimated_cost || 0), 0)
+      
+      return {
+        ...num,
+        prompt,
+        completion,
+        total: prompt + completion,
+        cost: cost.toFixed(4)
+      }
+    })
+
+    setNumbersUsage(aggregated)
   }
 
   const hour = new Date().getHours()
@@ -129,6 +216,52 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Tabla de Consumo por Número */}
+      <div className="glass-card usage-table-card" style={{ marginTop: '20px' }}>
+        <div className="card-header">
+          <Zap size={18} />
+          <h2>Consumo de Tokens y Costos por Número</h2>
+        </div>
+        <div className="table-responsive">
+          <table className="usage-table">
+            <thead>
+              <tr>
+                <th>Número</th>
+                <th>Teléfono</th>
+                <th>Estado Bot</th>
+                <th style={{ textAlign: 'right' }}>Tokens Entrada</th>
+                <th style={{ textAlign: 'right' }}>Tokens Salida</th>
+                <th style={{ textAlign: 'right' }}>Tokens Totales</th>
+                <th style={{ textAlign: 'right' }}>Costo (USD)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {numbersUsage.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="empty-state">No hay números registrados para este usuario</td>
+                </tr>
+              ) : (
+                numbersUsage.map(num => (
+                  <tr key={num.id}>
+                    <td className="font-semibold">{num.display_name}</td>
+                    <td className="font-mono text-xs">{num.phone_number || 'No asignado'}</td>
+                    <td>
+                      <span className={`status-pill ${num.bot_enabled ? 'active' : 'inactive'}`}>
+                        {num.bot_enabled ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'right' }} className="font-mono">{num.prompt.toLocaleString()}</td>
+                    <td style={{ textAlign: 'right' }} className="font-mono">{num.completion.toLocaleString()}</td>
+                    <td style={{ textAlign: 'right' }} className="font-mono">{num.total.toLocaleString()}</td>
+                    <td style={{ textAlign: 'right' }} className="font-mono text-accent font-semibold">${num.cost}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

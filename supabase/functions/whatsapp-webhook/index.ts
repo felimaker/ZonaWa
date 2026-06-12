@@ -80,8 +80,98 @@ serve(async (req) => {
       const fromMe = key?.fromMe
       
       if (fromMe) {
-        console.log("[OK] Mensaje enviado por el bot u operador (fromMe = true). Omitiendo procesamiento.");
-        return new Response(JSON.stringify({ success: true, ignored: true }), {
+        const messageId = key?.id
+        console.log(`[VERIFICADOR] Mensaje saliente detectado (fromMe = true), ID: ${messageId}`);
+        
+        // Comprobar si el mensaje ya existe en Supabase (evitar duplicar del Bot o Panel)
+        const { data: existingMsg, error: existErr } = await supabase
+          .from('messages')
+          .select('id')
+          .eq('whatsapp_message_id', messageId)
+          .maybeSingle()
+        
+        if (existingMsg) {
+          console.log("[OK] El mensaje ya existe en la base de datos (enviado por Bot o Panel). Omitiendo.");
+          return new Response(JSON.stringify({ success: true, ignored: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+        
+        // Si no existe, es un mensaje manual del operador desde su celular
+        let textContent = messageData?.conversation || 
+                          messageData?.extendedTextMessage?.text || 
+                          messageData?.imageMessage?.caption || 
+                          messageData?.videoMessage?.caption || 
+                          messageData?.documentMessage?.caption || 
+                          null
+
+        if (!textContent) {
+          console.log("[OK] Mensaje manual sin texto. Omitiendo.");
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+
+        console.log(`[VERIFICADOR] Mensaje manual del operador desde celular detectado: "${textContent}"`);
+
+        // Obtener el número de WhatsApp registrado
+        const { data: numData, error: numErr } = await supabase
+          .from('whatsapp_numbers')
+          .select('id, user_id')
+          .eq('session_name', instance)
+          .single()
+
+        if (numErr || !numData) {
+          console.error('[ERROR] No se encontró el número de WhatsApp para la sesión:', instance)
+          return new Response(JSON.stringify({ error: 'WhatsApp instance not found' }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+
+        const customerJid = key.remoteJid
+        const customerPhone = customerJid.split('@')[0]
+        const customerName = 'Cliente de WhatsApp' // pushName no disponible en fromMe
+
+        // Asegurar conversación
+        const { data: convData, error: convErr } = await supabase
+          .from('conversations')
+          .upsert({
+            number_id: numData.id,
+            customer_phone: customerPhone,
+            customer_name: customerName,
+            last_message_at: new Date().toISOString()
+          }, { onConflict: 'number_id,customer_phone' })
+          .select()
+          .single()
+
+        if (convErr || !convData) {
+          console.error('[ERROR] Al asegurar conversación para mensaje saliente:', convErr)
+          throw new Error('Database conversation error')
+        }
+
+        // Guardar mensaje manual en la base de datos
+        await insertMessageToDb(supabase, convData.id, messageId, 'agent', textContent)
+
+        // Obtener configuración de bot para comprobar continue_ai_after_manual
+        const { data: botConfig } = await supabase
+          .from('bot_configurations')
+          .select('continue_ai_after_manual')
+          .eq('number_id', numData.id)
+          .maybeSingle()
+
+        const continueAi = botConfig?.continue_ai_after_manual || false
+        const newStatus = continueAi ? 'BOT' : 'HUMAN'
+
+        await supabase
+          .from('conversations')
+          .update({ status: newStatus })
+          .eq('id', convData.id)
+
+        console.log(`[OK] Mensaje manual guardado. Estado de conversación actualizado a: ${newStatus}`);
+        await insertAuditLog(supabase, numData.user_id, numData.id, 'MANUAL_MESSAGE_DETECTED', `Mensaje manual enviado desde el celular. Estado de conversación: ${newStatus === 'BOT' ? 'Bot Activo' : 'Pausado (Handoff)'}`)
+
+        return new Response(JSON.stringify({ success: true, fromMe_processed: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
       }
@@ -285,6 +375,17 @@ serve(async (req) => {
           })
         }
 
+        // J. Cargar memoria contextual (últimos 10 mensajes del chat para contexto)
+        const { data: historyMessages } = await supabase
+          .from('messages')
+          .select('sender, content, created_at')
+          .eq('conversation_id', convData.id)
+          .order('created_at', { ascending: false })
+          .limit(10)
+
+        const sortedHistory = (historyMessages || []).reverse()
+        console.log(`[VERIFICADOR] Historial contextual cargado: ${sortedHistory.length} mensajes en memoria.`)
+
         // I. Evaluar Triggers de Activación (Manejo de Nulos)
         const triggerMode = botConfig.trigger_mode || 'all'
         const triggers = botConfig.triggers || []
@@ -294,16 +395,25 @@ serve(async (req) => {
 
         if (triggerMode === 'all') {
           triggerMatched = true
-        } else if (triggerMode === 'exact') {
-          triggerMatched = triggers.some((t: string) => {
-            const normT = t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
-            return normalizedMsg === normT
-          })
-        } else if (triggerMode === 'contains') {
-          triggerMatched = triggers.some((t: string) => {
-            const normT = t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
-            return normalizedMsg.includes(normT)
-          })
+        } else {
+          // Comprobar si hay respuestas previas del bot o del operador (indica chat ya activo)
+          const hasPriorResponse = sortedHistory.some((m: any) => m.sender === 'bot' || m.sender === 'agent')
+          if (hasPriorResponse) {
+            console.log("[VERIFICADOR] Conversación activa con respuestas previas de IA o Agente. Omitiendo disparadores.")
+            triggerMatched = true
+          } else {
+            if (triggerMode === 'exact') {
+              triggerMatched = triggers.some((t: string) => {
+                const normT = t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+                return normalizedMsg === normT
+              })
+            } else if (triggerMode === 'contains') {
+              triggerMatched = triggers.some((t: string) => {
+                const normT = t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+                return normalizedMsg.includes(normT)
+              })
+            }
+          }
         }
 
         if (!triggerMatched) {
@@ -313,18 +423,6 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           })
         }
-
-        // J. Cargar memoria contextual (últimos 15 mensajes del chat en 24h)
-        const { data: historyMessages } = await supabase
-          .from('messages')
-          .select('sender, content, created_at')
-          .eq('conversation_id', convData.id)
-          .gt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-          .order('created_at', { ascending: false })
-          .limit(15)
-
-        const sortedHistory = (historyMessages || []).reverse()
-        console.log(`[VERIFICADOR] Historial contextual cargado: ${sortedHistory.length} mensajes en memoria.`)
 
         // I. Obtener Conexión de IA Activa y Cifrada
         const { data: connData, error: connErr } = await supabase
@@ -506,15 +604,7 @@ serve(async (req) => {
           await insertAuditLog(supabase, numData.user_id, numData.id, 'AI_RESPONSE', `IA respondió a ${customerPhone} exitosamente usando ${connData.provider}.`)
 
           // Registrar Log de Consumo
-          let costPerPrompt = 0
-          let costPerCompletion = 0
-          if (connData.provider === 'openai') {
-            costPerPrompt = 0.000150 / 1000 // gpt-4o-mini
-            costPerCompletion = 0.000600 / 1000
-          } else if (connData.provider === 'gemini') {
-            costPerPrompt = 0.000075 / 1000 // gemini-1.5-flash
-            costPerCompletion = 0.000300 / 1000
-          }
+          const { costPerPrompt, costPerCompletion } = getModelRates(connData.provider, modelName || '')
           const estimatedCost = (tokensPrompt * costPerPrompt) + (tokensCompletion * costPerCompletion)
 
           await supabase.from('usage_logs').insert({
@@ -547,6 +637,59 @@ serve(async (req) => {
 
 // HELPERS
 
+function getModelRates(provider: string, model: string) {
+  let costPerPrompt = 0; // Costo por token (costo por millón / 1,000,000)
+  let costPerCompletion = 0;
+
+  const normalizedModel = model.toLowerCase();
+
+  if (provider === 'openai') {
+    if (normalizedModel.includes('gpt-4o-mini')) {
+      costPerPrompt = 0.15 / 1000000;
+      costPerCompletion = 0.60 / 1000000;
+    } else if (normalizedModel.includes('gpt-4o')) {
+      costPerPrompt = 2.50 / 1000000;
+      costPerCompletion = 10.00 / 1000000;
+    } else {
+      // Fallback
+      costPerPrompt = 0.15 / 1000000;
+      costPerCompletion = 0.60 / 1000000;
+    }
+  } else if (provider === 'claude') {
+    if (normalizedModel.includes('3-5-sonnet') || normalizedModel.includes('3.5-sonnet')) {
+      costPerPrompt = 3.00 / 1000000;
+      costPerCompletion = 15.00 / 1000000;
+    } else if (normalizedModel.includes('3-5-haiku') || normalizedModel.includes('3.5-haiku')) {
+      costPerPrompt = 0.80 / 1000000;
+      costPerCompletion = 4.00 / 1000000;
+    } else {
+      // Fallback
+      costPerPrompt = 3.00 / 1000000;
+      costPerCompletion = 15.00 / 1000000;
+    }
+  } else if (provider === 'gemini') {
+    if (normalizedModel.includes('pro')) {
+      costPerPrompt = 1.25 / 1000000;
+      costPerCompletion = 5.00 / 1000000;
+    } else {
+      // Fallback a Flash
+      costPerPrompt = 0.075 / 1000000;
+      costPerCompletion = 0.30 / 1000000;
+    }
+  } else if (provider === 'groq') {
+    if (normalizedModel.includes('70b')) {
+      costPerPrompt = 0.59 / 1000000;
+      costPerCompletion = 0.79 / 1000000;
+    } else {
+      // Fallback a 8B
+      costPerPrompt = 0.05 / 1000000;
+      costPerCompletion = 0.08 / 1000000;
+    }
+  }
+
+  return { costPerPrompt, costPerCompletion };
+}
+
 async function insertMessageToDb(supabase: any, conversationId: string, messageId: string | null, sender: string, content: string) {
   const insertPayload: any = {
     conversation_id: conversationId,
@@ -573,10 +716,10 @@ async function insertMessageToDb(supabase: any, conversationId: string, messageI
   return data
 }
 
-async function sendWhatsappMessage(serverUrl: string, apikey: string, instanceName: string, number: string, text: string) {
+async function sendWhatsappMessage(serverUrl: string, apikey: string, instanceName: string, number: string, text: string): Promise<string | null> {
   if (!serverUrl || !apikey) {
     console.error("[ERROR] No se puede enviar mensaje: faltan serverUrl o apikey.")
-    return
+    return null
   }
   const cleanUrl = serverUrl.endsWith('/') ? serverUrl.slice(0, -1) : serverUrl
   const url = `${cleanUrl}/message/sendText/${instanceName}`
@@ -600,11 +743,15 @@ async function sendWhatsappMessage(serverUrl: string, apikey: string, instanceNa
       const errorText = await res.text()
       console.error(`[ERROR] sendText falló. HTTP status: ${res.status}. Detalle: ${errorText}`)
     } else {
-      console.log(`[OK] Mensaje de texto enviado con éxito a ${number}`)
+      const resJson = await res.json()
+      const msgId = resJson?.key?.id || null
+      console.log(`[OK] Mensaje de texto enviado con éxito a ${number}, ID: ${msgId}`)
+      return msgId
     }
   } catch (e) {
     console.error("[ERROR] Excepción llamando a sendText de Evolution API:", e)
   }
+  return null
 }
 
 async function insertAuditLog(supabase: any, userId: string, numberId: string, eventType: string, details: string) {

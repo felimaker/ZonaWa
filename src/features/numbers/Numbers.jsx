@@ -134,8 +134,10 @@ export default function Numbers() {
     handoff_triggers: ['humano', 'asesor', 'soporte'],
     fallback_message: 'Lo siento, no he podido procesar tu solicitud.',
     respond_saved_contacts: true,
-    unsaved_contacts_action: 'respond'
+    unsaved_contacts_action: 'respond',
+    continue_ai_after_manual: false
   })
+  const [selectedOnboardingAgentId, setSelectedOnboardingAgentId] = useState('')
   const [triggerInput, setTriggerInput] = useState('')
   const [handoffInput, setHandoffInput] = useState('')
   const [savingOnboarding, setSavingOnboarding] = useState(false)
@@ -610,7 +612,7 @@ export default function Numbers() {
   async function fetchNumbers() {
     const { data, error } = await supabase
       .from('whatsapp_numbers')
-      .select('*, bot_configurations(id, agent_id, connection_id)')
+      .select('*, bot_configurations(*)')
       .eq('user_id', user.id)
       .order('created_at', { ascending: true })
     if (error) {
@@ -697,6 +699,7 @@ export default function Numbers() {
 
   // Initialize onboarding wizard for new or existing number
   async function openOnboarding(existingNumber = null) {
+    await fetchSavedAgents()
     if (existingNumber) {
       const isConnected = existingNumber.status === 'CONNECTED'
       setOnboardingStep(isConnected ? 2 : 1)
@@ -719,6 +722,7 @@ export default function Numbers() {
       setOnboardingConfig(config || null)
       if (config) {
         setSelectedConnId(config.connection_id || '')
+        setSelectedOnboardingAgentId(config.agent_id || '')
         setAgentForm({
           name: config.agents?.name || `Agente - ${existingNumber.display_name}`,
           role_prompt: config.agents?.role_prompt || '',
@@ -732,9 +736,11 @@ export default function Numbers() {
           fallback_message: config.fallback_message || 'Lo siento, no he podido procesar tu solicitud.',
           respond_saved_contacts: config.respond_saved_contacts !== undefined ? config.respond_saved_contacts : true,
           unsaved_contacts_action: config.unsaved_contacts_action || 'respond',
+          continue_ai_after_manual: config.continue_ai_after_manual || false
         })
       } else {
         setSelectedConnId('')
+        setSelectedOnboardingAgentId('')
         setAgentForm({
           name: `Agente - ${existingNumber.display_name}`,
           role_prompt: '',
@@ -748,6 +754,7 @@ export default function Numbers() {
           fallback_message: 'Lo siento, no he podido procesar tu solicitud.',
           respond_saved_contacts: true,
           unsaved_contacts_action: 'respond',
+          continue_ai_after_manual: false
         })
       }
     } else {
@@ -760,6 +767,7 @@ export default function Numbers() {
       setInstanceStatus('CREATED')
       setQrCode('')
       setSelectedConnId('')
+      setSelectedOnboardingAgentId('')
       setAgentForm({
         name: '',
         role_prompt: '',
@@ -772,7 +780,8 @@ export default function Numbers() {
         handoff_triggers: ['humano', 'asesor', 'soporte'],
         fallback_message: 'Lo siento, no he podido procesar tu solicitud.',
         respond_saved_contacts: true,
-        unsaved_contacts_action: 'respond'
+        unsaved_contacts_action: 'respond',
+        continue_ai_after_manual: false
       })
     }
     
@@ -930,27 +939,33 @@ export default function Numbers() {
     if (!selectedConnId) {
       toast({ message: 'Debes seleccionar un proveedor de IA', type: 'warning' }); return
     }
-    if (!agentForm.name.trim() || !agentForm.role_prompt.trim()) {
+    if ((selectedOnboardingAgentId === 'new' || !selectedOnboardingAgentId) && (!agentForm.name.trim() || !agentForm.role_prompt.trim())) {
       toast({ message: 'Completa la identidad y prompt del agente', type: 'warning' }); return
+    }
+    if (!selectedOnboardingAgentId) {
+      toast({ message: 'Por favor, selecciona o crea un Estilo IA', type: 'warning' }); return
     }
     
     setSavingOnboarding(true)
     try {
-      // 1. Upsert Agent
-      const agentPayload = {
-        user_id: user.id,
-        name: agentForm.name,
-        role_prompt: agentForm.role_prompt,
-        model: agentForm.model || 'gpt-4o-mini',
-        rules: agentForm.rules || [],
-        temperature: parseFloat(agentForm.temperature),
-        max_tokens: parseInt(agentForm.max_tokens),
-      }
-      let agentId = onboardingConfig?.agent_id
-      if (agentId) {
-        await supabase.from('agents').update(agentPayload).eq('id', agentId)
-      } else {
-        const { data: newAgent, error: aErr } = await supabase.from('agents').insert(agentPayload).select().single()
+      let agentId = selectedOnboardingAgentId
+
+      // 1. If it's a new style, save it canonically to the agents table first
+      if (selectedOnboardingAgentId === 'new') {
+        const agentPayload = {
+          user_id: user.id,
+          name: agentForm.name,
+          role_prompt: agentForm.role_prompt,
+          model: agentForm.model || 'gpt-4o-mini',
+          rules: agentForm.rules || [],
+          temperature: parseFloat(agentForm.temperature),
+          max_tokens: parseInt(agentForm.max_tokens),
+        }
+        const { data: newAgent, error: aErr } = await supabase
+          .from('agents')
+          .insert(agentPayload)
+          .select()
+          .single()
         if (aErr) throw aErr
         agentId = newAgent.id
       }
@@ -966,6 +981,7 @@ export default function Numbers() {
         trigger_mode: agentForm.trigger_mode,
         respond_saved_contacts: agentForm.respond_saved_contacts,
         unsaved_contacts_action: agentForm.unsaved_contacts_action,
+        continue_ai_after_manual: agentForm.continue_ai_after_manual,
         updated_at: new Date().toISOString(),
       }
       
@@ -1155,28 +1171,38 @@ export default function Numbers() {
     setSendingReply(true)
     try {
       const cleanPhone = customerPhone.split('@')[0]
-      await sendTextMessage(detailsNumber.session_name, cleanPhone, text)
+      const response = await sendTextMessage(detailsNumber.session_name, cleanPhone, text)
+      const whatsappMsgId = response?.key?.id || null
 
       const { data: newMsg, error: msgErr } = await supabase
         .from('messages')
         .insert({
           conversation_id: convId,
           sender: 'agent',
-          content: text
+          content: text,
+          whatsapp_message_id: whatsappMsgId
         })
         .select()
         .single()
 
       if (msgErr) throw msgErr
 
+      // Check bot configurations to set the correct status
+      const botConfig = detailsNumber.bot_configurations?.[0]
+      const continueAi = botConfig?.continue_ai_after_manual || false
+      const newStatus = continueAi ? 'BOT' : 'HUMAN'
+
       const { error: handoffErr } = await supabase
         .from('conversations')
-        .update({ status: 'HUMAN', last_message_at: new Date().toISOString() })
+        .update({ status: newStatus, last_message_at: new Date().toISOString() })
         .eq('id', convId)
 
       if (handoffErr) throw handoffErr
 
-      toast({ message: 'Mensaje enviado y bot pausado para este chat.', type: 'success' })
+      toast({ 
+        message: continueAi ? 'Mensaje enviado. El bot continuará activo.' : 'Mensaje enviado y bot pausado para este chat.', 
+        type: 'success' 
+      })
       setReplyText('')
 
       const updatedMsg = newMsg || { content: text, sender: 'agent', created_at: new Date().toISOString() }
@@ -1185,7 +1211,7 @@ export default function Numbers() {
         if (!prev) return null
         return {
           ...prev,
-          status: 'HUMAN',
+          status: newStatus,
           messages: [...(prev.messages || []), updatedMsg]
         }
       })
@@ -1194,7 +1220,7 @@ export default function Numbers() {
         if (c.id === convId) {
           return {
             ...c,
-            status: 'HUMAN',
+            status: newStatus,
             messages: [...(c.messages || []), updatedMsg],
             lastMessage: updatedMsg
           }
@@ -1890,113 +1916,183 @@ export default function Numbers() {
           <div className="wizard-content" style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: '4px' }}>
             <form onSubmit={handleOnboardingComplete} className="modal-form" style={{ gap: '16px' }}>
               
-              {/* Identidad del Agente */}
+              {/* Selección de Estilo IA */}
               <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: '8px' }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-1)' }}>Identidad del Agente</h4>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-1)' }}>Estilo IA (Plantilla del Agente)</h4>
                 <div className="form-group">
-                  <label>Nombre del Agente</label>
-                  <input
-                    type="text"
-                    placeholder="Ej: Agente Comercial"
-                    value={agentForm.name}
-                    onChange={e => setAgentForm({ ...agentForm, name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Prompt de Rol (System Prompt)</label>
-                  <textarea
-                    rows={4}
-                    placeholder="Eres un vendedor virtual..."
-                    value={agentForm.role_prompt}
-                    onChange={e => setAgentForm({ ...agentForm, role_prompt: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Modelo de IA</label>
+                  <label>Seleccionar Estilo</label>
                   <select
-                    value={agentForm.model}
-                    onChange={e => setAgentForm({ ...agentForm, model: e.target.value })}
+                    value={selectedOnboardingAgentId}
+                    onChange={e => {
+                      const val = e.target.value
+                      setSelectedOnboardingAgentId(val)
+                      if (val === 'new') {
+                        setAgentForm(prev => ({
+                          ...prev,
+                          name: '',
+                          role_prompt: '',
+                          model: prev.model || 'gpt-4o-mini',
+                          rules: [],
+                          temperature: 0.7,
+                          max_tokens: 300
+                        }))
+                      } else {
+                        const selected = savedAgents.find(a => a.id === val)
+                        if (selected) {
+                          setAgentForm(prev => ({
+                            ...prev,
+                            name: selected.name,
+                            role_prompt: selected.role_prompt,
+                            model: selected.model,
+                            rules: selected.rules || [],
+                            temperature: selected.temperature,
+                            max_tokens: selected.max_tokens
+                          }))
+                        }
+                      }
+                    }}
                     required
                   >
-                    {(() => {
-                      const conn = connections.find(c => c.id === selectedConnId)
-                      const provider = conn?.provider || 'openai'
-                      const models = PROVIDER_MODELS[provider] || []
-                      return models.map(m => (
-                        <option key={m.id} value={m.id}>{m.label}</option>
-                      ))
-                    })()}
+                    <option value="">-- Selecciona un Estilo IA --</option>
+                    <option value="new">+ Crear Nuevo Estilo IA (Canónico)</option>
+                    {savedAgents.map(agent => (
+                      <option key={agent.id} value={agent.id}>{agent.name}</option>
+                    ))}
                   </select>
                 </div>
               </div>
 
-              {/* Parámetros */}
-              <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: '8px' }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-1)' }}>Parámetros</h4>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Temperatura: <strong>{agentForm.temperature}</strong></label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1.2"
-                      step="0.1"
-                      value={agentForm.temperature}
-                      onChange={e => setAgentForm({ ...agentForm, temperature: e.target.value })}
-                    />
+              {/* Vista previa si ya existe un Estilo seleccionado */}
+              {selectedOnboardingAgentId && selectedOnboardingAgentId !== 'new' && (
+                <div style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '0.8rem', color: 'var(--text-2)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div><strong style={{ color: 'var(--text-1)' }}>System Prompt:</strong> {agentForm.role_prompt}</div>
+                  <div>
+                    <strong style={{ color: 'var(--text-1)' }}>Modelo:</strong> {agentForm.model} · 
+                    <strong style={{ color: 'var(--text-1)' }}> Temp:</strong> {agentForm.temperature} · 
+                    <strong style={{ color: 'var(--text-1)' }}> Max Tokens:</strong> {agentForm.max_tokens}
                   </div>
-                  <div className="form-group">
-                    <label>Tokens Máximos</label>
-                    <input
-                      type="number"
-                      min="100"
-                      max="4000"
-                      value={agentForm.max_tokens}
-                      onChange={e => setAgentForm({ ...agentForm, max_tokens: e.target.value })}
-                    />
+                  <div>
+                    <strong style={{ color: 'var(--text-1)' }}>Reglas Activas:</strong> {(agentForm.rules || []).length > 0 ? (
+                      (agentForm.rules || []).map(r => AVAILABLE_RULES.find(rule => rule.key === r)?.label || r).join(', ')
+                    ) : (
+                      'Ninguna'
+                    )}
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Reglas del Bot */}
-              <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: '8px' }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-1)' }}>Reglas del Bot (Instrucciones Rápidas)</h4>
-                <small style={{ color: 'var(--text-3)', display: 'block', marginBottom: '10px', fontSize: '0.72rem' }}>
-                  Activa pautas de comportamiento específicas para moderar y optimizar la respuesta del bot.
-                </small>
-                <div className="rules-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '8px' }}>
-                  {AVAILABLE_RULES.map(rule => {
-                    const isActive = (agentForm.rules || []).includes(rule.key)
-                    return (
-                      <div 
-                        key={rule.key} 
-                        onClick={() => toggleRuleOnboarding(rule.key)}
-                        style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          padding: '10px',
-                          background: isActive ? 'rgba(59, 130, 246, 0.08)' : 'rgba(255, 255, 255, 0.01)',
-                          border: isActive ? '1px solid var(--primary)' : '1px solid var(--border)',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                        }}
-                        className="rule-card"
+              {/* Formulario de creación de nuevo Estilo (solo si selectedOnboardingAgentId === 'new') */}
+              {selectedOnboardingAgentId === 'new' && (
+                <>
+                  {/* Identidad del Agente */}
+                  <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-1)' }}>Identidad del Agente</h4>
+                    <div className="form-group">
+                      <label>Nombre del Agente</label>
+                      <input
+                        type="text"
+                        placeholder="Ej: Agente Comercial"
+                        value={agentForm.name}
+                        onChange={e => setAgentForm({ ...agentForm, name: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Prompt de Rol (System Prompt)</label>
+                      <textarea
+                        rows={4}
+                        placeholder="Eres un vendedor virtual..."
+                        value={agentForm.role_prompt}
+                        onChange={e => setAgentForm({ ...agentForm, role_prompt: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Modelo de IA</label>
+                      <select
+                        value={agentForm.model}
+                        onChange={e => setAgentForm({ ...agentForm, model: e.target.value })}
+                        required
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                          <strong style={{ fontSize: '0.8rem', color: isActive ? 'var(--primary-light)' : 'var(--text-1)' }}>{rule.label}</strong>
-                          <div className={`toggle-switch ${isActive ? 'on' : ''}`} style={{ transform: 'scale(0.75)', pointerEvents: 'none' }}>
-                            <span className="toggle-knob" />
-                          </div>
-                        </div>
-                        <span style={{ fontSize: '0.68rem', color: 'var(--text-3)', lineHeight: '1.2' }}>{rule.desc}</span>
+                        {(() => {
+                          const conn = connections.find(c => c.id === selectedConnId)
+                          const provider = conn?.provider || 'openai'
+                          const models = PROVIDER_MODELS[provider] || []
+                          return models.map(m => (
+                            <option key={m.id} value={m.id}>{m.label}</option>
+                          ))
+                        })()}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Parámetros */}
+                  <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-1)' }}>Parámetros</h4>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>Temperatura: <strong>{agentForm.temperature}</strong></label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1.2"
+                          step="0.1"
+                          value={agentForm.temperature}
+                          onChange={e => setAgentForm({ ...agentForm, temperature: e.target.value })}
+                        />
                       </div>
-                    )
-                  })}
-                </div>
-              </div>
+                      <div className="form-group">
+                        <label>Tokens Máximos</label>
+                        <input
+                          type="number"
+                          min="100"
+                          max="4000"
+                          value={agentForm.max_tokens}
+                          onChange={e => setAgentForm({ ...agentForm, max_tokens: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Reglas del Bot */}
+                  <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-1)' }}>Reglas del Bot (Instrucciones Rápidas)</h4>
+                    <small style={{ color: 'var(--text-3)', display: 'block', marginBottom: '10px', fontSize: '0.72rem' }}>
+                      Activa pautas de comportamiento específicas para moderar y optimizar la respuesta del bot.
+                    </small>
+                    <div className="rules-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '8px' }}>
+                      {AVAILABLE_RULES.map(rule => {
+                        const isActive = (agentForm.rules || []).includes(rule.key)
+                        return (
+                          <div 
+                            key={rule.key} 
+                            onClick={() => toggleRuleOnboarding(rule.key)}
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              padding: '10px',
+                              background: isActive ? 'rgba(59, 130, 246, 0.08)' : 'rgba(255, 255, 255, 0.01)',
+                              border: isActive ? '1px solid var(--primary)' : '1px solid var(--border)',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                            }}
+                            className="rule-card"
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                              <strong style={{ fontSize: '0.8rem', color: isActive ? 'var(--primary-light)' : 'var(--text-1)' }}>{rule.label}</strong>
+                              <div className={`toggle-switch ${isActive ? 'on' : ''}`} style={{ transform: 'scale(0.75)', pointerEvents: 'none' }}>
+                                <span className="toggle-knob" />
+                              </div>
+                            </div>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--text-3)', lineHeight: '1.2' }}>{rule.desc}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
 
               {/* Modo de Activación & Triggers */}
               <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: '8px' }}>
@@ -2120,6 +2216,22 @@ export default function Numbers() {
                     value={agentForm.fallback_message}
                     onChange={e => setAgentForm({ ...agentForm, fallback_message: e.target.value })}
                   />
+                </div>
+
+                <div className="form-group" style={{ marginTop: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                    <div>
+                      <span style={{ fontWeight: '500', fontSize: '0.8rem', display: 'block', color: 'var(--text-1)' }}>Continuar IA tras Mensaje Manual</span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-2)' }}>Si respondes manualmente, el bot seguirá respondiendo a los próximos mensajes del cliente.</span>
+                    </div>
+                    <button
+                      type="button"
+                      className={`toggle-switch ${agentForm.continue_ai_after_manual ? 'on' : ''}`}
+                      onClick={() => setAgentForm(prev => ({ ...prev, continue_ai_after_manual: !prev.continue_ai_after_manual }))}
+                    >
+                      <span className="toggle-knob" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
