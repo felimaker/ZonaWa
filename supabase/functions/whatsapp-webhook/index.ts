@@ -28,7 +28,10 @@ serve(async (req) => {
     console.log("Datos:", JSON.stringify(payload.data, null, 2))
     console.log("=========================================")
 
-    const { event, instance, data } = payload
+    const { event, data } = payload
+    const instance = payload.instance || payload.instanceName || payload.instance_name
+    const eventLower = (event || '').toLowerCase().replace('_', '.')
+    console.log(`[VERIFICADOR] Procesando Evento Normalizado: "${eventLower}" para Instancia: "${instance}"`)
 
     if (!instance) {
       console.error("[ERROR] No se recibió el nombre de la instancia en el webhook.");
@@ -39,7 +42,7 @@ serve(async (req) => {
     }
 
     // 1. EVENTO: ACTUALIZACIÓN DE CONEXIÓN
-    if (event === 'connection.update') {
+    if (eventLower === 'connection.update') {
       const state = data?.state
       const phone = data?.phone || data?.number || ""
       
@@ -74,7 +77,7 @@ serve(async (req) => {
     }
 
     // 2. EVENTO: RECEPCIÓN DE MENSAJES
-    if (event === 'messages.upsert') {
+    if (eventLower === 'messages.upsert') {
       const messageData = data?.message
       const key = data?.key
       const fromMe = key?.fromMe
@@ -133,35 +136,68 @@ serve(async (req) => {
         const customerPhone = customerJid.split('@')[0]
         const customerName = 'Cliente de WhatsApp' // pushName no disponible en fromMe
 
-        // Asegurar conversación
-        const { data: convData, error: convErr } = await supabase
+        // Asegurar conversación sin sobreescribir last_message_at ni status
+        let { data: convData, error: convErr } = await supabase
           .from('conversations')
-          .upsert({
-            number_id: numData.id,
-            customer_phone: customerPhone,
-            customer_name: customerName,
-            last_message_at: new Date().toISOString()
-          }, { onConflict: 'number_id,customer_phone' })
-          .select()
-          .single()
+          .select('*')
+          .eq('number_id', numData.id)
+          .eq('customer_phone', customerPhone)
+          .maybeSingle()
 
-        if (convErr || !convData) {
-          console.error('[ERROR] Al asegurar conversación para mensaje saliente:', convErr)
-          throw new Error('Database conversation error')
+        if (convErr) {
+          console.error('[ERROR] Al buscar conversación para mensaje saliente:', convErr)
+          throw convErr
+        }
+
+        if (!convData) {
+          const { data: newConv, error: createErr } = await supabase
+            .from('conversations')
+            .insert({
+              number_id: numData.id,
+              customer_phone: customerPhone,
+              customer_name: customerName,
+              last_message_at: new Date().toISOString()
+            })
+            .select()
+            .single()
+
+          if (createErr || !newConv) {
+            console.error('[ERROR] Al crear conversación para mensaje saliente:', createErr)
+            throw new Error('Database conversation error')
+          }
+          convData = newConv
         }
 
         // Guardar mensaje manual en la base de datos
         await insertMessageToDb(supabase, convData.id, messageId, 'agent', textContent)
 
-        // Obtener configuración de bot para comprobar continue_ai_after_manual
+        // Obtener configuración de bot para comprobar triggers y continue_ai_after_manual
         const { data: botConfig } = await supabase
           .from('bot_configurations')
-          .select('continue_ai_after_manual')
+          .select('*')
           .eq('number_id', numData.id)
           .maybeSingle()
 
+        const normBotTrigger = (botConfig?.bot_trigger || 'bot').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+        const normStopTrigger = (botConfig?.stop_trigger || 'stop').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+        const normalizedMsg = textContent.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+
+        const isBotTriggered = normalizedMsg === normBotTrigger
+        const isStopTriggered = normalizedMsg === normStopTrigger
+
         const continueAi = botConfig?.continue_ai_after_manual || false
-        const newStatus = continueAi ? 'BOT' : 'HUMAN'
+        let newStatus = convData.status
+
+        if (isBotTriggered) {
+          newStatus = 'BOT'
+          console.log(`[VERIFICADOR] Operador envía bot_trigger desde celular. Reactivando bot a BOT.`)
+        } else if (isStopTriggered) {
+          newStatus = 'HUMAN'
+          console.log(`[VERIFICADOR] Operador envía stop_trigger desde celular. Pausando bot a HUMAN.`)
+        } else {
+          newStatus = continueAi ? 'BOT' : 'HUMAN'
+          console.log(`[VERIFICADOR] Operador envía mensaje manual ordinario desde celular. continueAi = ${continueAi}. Nuevo estado: ${newStatus}`)
+        }
 
         await supabase
           .from('conversations')
@@ -169,7 +205,18 @@ serve(async (req) => {
           .eq('id', convData.id)
 
         console.log(`[OK] Mensaje manual guardado. Estado de conversación actualizado a: ${newStatus}`);
-        await insertAuditLog(supabase, numData.user_id, numData.id, 'MANUAL_MESSAGE_DETECTED', `Mensaje manual enviado desde el celular. Estado de conversación: ${newStatus === 'BOT' ? 'Bot Activo' : 'Pausado (Handoff)'}`)
+
+        let auditEvent = 'MANUAL_MESSAGE_DETECTED'
+        let auditDetails = `Mensaje manual enviado desde el celular. Estado de conversación: ${newStatus === 'BOT' ? 'Bot Activo' : 'Pausado (Handoff)'}`
+        if (isBotTriggered) {
+          auditEvent = 'BOT_REACTIVATED'
+          auditDetails = `Bot reactivado manualmente por operador desde celular.`
+        } else if (isStopTriggered) {
+          auditEvent = 'BOT_PAUSED'
+          auditDetails = `Bot pausado manualmente por operador desde celular.`
+        }
+
+        await insertAuditLog(supabase, numData.user_id, numData.id, auditEvent, auditDetails)
 
         return new Response(JSON.stringify({ success: true, fromMe_processed: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -216,24 +263,40 @@ serve(async (req) => {
 
         console.log(`[VERIFICADOR] Instancia encontrada: ID ${numData.id}. ¿Bot Activo?: ${numData.bot_enabled}`)
 
-        // B. Asegurar que la conversación exista en la base de datos
-        const { data: convData, error: convErr } = await supabase
+        // B. Asegurar que la conversación exista en la base de datos sin sobreescribir last_message_at
+        let { data: convData, error: convErr } = await supabase
           .from('conversations')
-          .upsert({
-            number_id: numData.id,
-            customer_phone: customerPhone,
-            customer_name: customerName,
-            last_message_at: new Date().toISOString()
-          }, { onConflict: 'number_id,customer_phone' })
-          .select()
-          .single()
+          .select('*')
+          .eq('number_id', numData.id)
+          .eq('customer_phone', customerPhone)
+          .maybeSingle()
 
-        if (convErr || !convData) {
-          console.error('[ERROR] Al asegurar la conversación en Supabase:', convErr)
-          throw new Error('Database conversation error')
+        if (convErr) {
+          console.error('[ERROR] Al buscar conversación en Supabase:', convErr)
+          throw convErr
         }
 
-        console.log(`[VERIFICADOR] Conversación ID: ${convData.id}. Estado de handoff: ${convData.status}`)
+        if (!convData) {
+          console.log(`[VERIFICADOR] Conversación no encontrada para número ${numData.id} y cliente ${customerPhone}. Creando...`)
+          const { data: newConv, error: createErr } = await supabase
+            .from('conversations')
+            .insert({
+              number_id: numData.id,
+              customer_phone: customerPhone,
+              customer_name: customerName,
+              last_message_at: new Date().toISOString()
+            })
+            .select()
+            .single()
+
+          if (createErr || !newConv) {
+            console.error('[ERROR] Al crear la conversación en Supabase:', createErr)
+            throw new Error('Database conversation error')
+          }
+          convData = newConv
+        }
+
+        console.log(`[VERIFICADOR] Conversación ID: ${convData.id}. Estado de handoff: ${convData.status}, Último mensaje en: ${convData.last_message_at}`)
 
         // C. Guardar mensaje del cliente en BD inmediatamente para el registro de tráfico
         const insertedMsg = await insertMessageToDb(supabase, convData.id, messageId, 'customer', textContent)
@@ -253,16 +316,7 @@ serve(async (req) => {
           })
         }
 
-        // E. Si el estado es HUMAN, omitimos el bot (el mensaje ya quedó registrado)
-        if (convData.status === 'HUMAN') {
-          console.log(`[OK] Conversación con ${customerPhone} está en modo manual (HUMAN). Mensaje guardado, omitiendo IA.`)
-          await insertAuditLog(supabase, numData.user_id, numData.id, 'HANDOFF_ACTIVE', `Mensaje recibido de ${customerPhone} pero omitido por estar en modo manual (Operador Humano).`)
-          return new Response(JSON.stringify({ success: true, status: 'human_intervention' }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          })
-        }
-
-        // F. Obtener la configuración del bot para este número
+        // F. Obtener la configuración del bot para este número (cargado anticipadamente)
         const { data: botConfig, error: configErr } = await supabase
           .from('bot_configurations')
           .select('*, agents(*)')
@@ -279,6 +333,53 @@ serve(async (req) => {
         }
 
         console.log(`[VERIFICADOR] Configuración del Bot cargada: Agent ID ${botConfig.agent_id}, Connection ID ${botConfig.connection_id}`)
+
+        // E. Evaluar reactivación si el estado actual es HUMAN (Modo Manual)
+        const normBotTrigger = (botConfig.bot_trigger || 'bot').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+        const normStopTrigger = (botConfig.stop_trigger || 'stop').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+        const normalizedMsg = textContent.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+
+        if (convData.status === 'HUMAN') {
+          const isBotTriggered = normalizedMsg === normBotTrigger
+          let isInactive = false
+
+          if (botConfig.inactivity_wait_minutes > 0 && convData.last_message_at) {
+            const now = new Date()
+            const lastMessageTime = new Date(convData.last_message_at)
+            const diffMinutes = (now.getTime() - lastMessageTime.getTime()) / (1000 * 60)
+            if (diffMinutes >= botConfig.inactivity_wait_minutes) {
+              isInactive = true
+            }
+            console.log(`[VERIFICADOR] Conversación en HUMAN. Diferencia de tiempo: ${diffMinutes.toFixed(2)} min (Espera: ${botConfig.inactivity_wait_minutes} min). Inactivo: ${isInactive}`)
+          }
+
+          if (isBotTriggered || isInactive) {
+            console.log(`[VERIFICADOR] Reactivando bot (isBotTriggered: ${isBotTriggered}, isInactive: ${isInactive})`)
+            const { error: updateErr } = await supabase
+              .from('conversations')
+              .update({ status: 'BOT' })
+              .eq('id', convData.id)
+
+            if (updateErr) {
+              console.error("[ERROR] Al actualizar estado de la conversación a BOT:", updateErr)
+            } else {
+              convData.status = 'BOT'
+              const logDetails = isBotTriggered
+                ? `Bot reactivado manualmente por palabra clave "${botConfig.bot_trigger}" del cliente.`
+                : `Bot reactivado automáticamente por inactividad de ${botConfig.inactivity_wait_minutes} minutos.`
+              await insertAuditLog(supabase, numData.user_id, numData.id, 'BOT_REACTIVATED', logDetails)
+            }
+          }
+        }
+
+        // Si sigue estando en modo HUMAN, omitimos la IA
+        if (convData.status === 'HUMAN') {
+          console.log(`[OK] Conversación con ${customerPhone} está en modo manual (HUMAN). Mensaje guardado, omitiendo IA.`)
+          await insertAuditLog(supabase, numData.user_id, numData.id, 'HANDOFF_ACTIVE', `Mensaje recibido de ${customerPhone} pero omitido por estar en modo manual (Operador Humano).`)
+          return new Response(JSON.stringify({ success: true, status: 'human_intervention' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
 
         // G. Validar Filtros de Destinatarios (Guardados vs No Guardados)
         let isContactSaved = false
@@ -353,22 +454,25 @@ serve(async (req) => {
         }
 
         // H. Evaluar Handoff Triggers (Intervención Humana)
-        const normalizedMsg = textContent.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+        const isStopTriggered = normalizedMsg === normStopTrigger
         const handoffTriggers = botConfig.handoff_triggers || []
-        const isHandoffTriggered = handoffTriggers.some((t: string) => {
+        const isHandoffTriggered = isStopTriggered || handoffTriggers.some((t: string) => {
           const normT = t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
           return normalizedMsg.includes(normT)
         })
 
         if (isHandoffTriggered) {
-          console.log(`[OK] Handoff activado por palabra clave de escape. Transfiriendo conversación a humano.`)
+          console.log(`[OK] Handoff activado por trigger de parada o palabra clave. Transfiriendo conversación a humano.`)
           await supabase.from('conversations').update({ status: 'HUMAN' }).eq('id', convData.id)
           
           const handoffReply = "Tu conversación ha sido transferida a un asesor. El asistente de IA se ha pausado."
           await sendWhatsappMessage(EVOLUTION_API_URL, EVOLUTION_API_TOKEN, instance, customerPhone, handoffReply)
           await insertMessageToDb(supabase, convData.id, null, 'bot', handoffReply)
           
-          await insertAuditLog(supabase, numData.user_id, numData.id, 'HANDOFF_TRIGGERED', `Intervención humana activada automáticamente por palabra clave en chat: ${customerPhone}`)
+          const triggerDetail = isStopTriggered 
+            ? `Intervención humana activada por trigger de parada "${botConfig.stop_trigger}".`
+            : `Intervención humana activada automáticamente por palabra clave de handoff.`
+          await insertAuditLog(supabase, numData.user_id, numData.id, 'HANDOFF_TRIGGERED', `${triggerDetail} Cliente: ${customerPhone}`)
 
           return new Response(JSON.stringify({ success: true, status: 'handoff_triggered' }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -480,7 +584,8 @@ serve(async (req) => {
           }))
         ]
 
-        console.log(`[VERIFICADOR] Llamando al LLM: ${connData.provider} con System Prompt: "${systemPrompt.slice(0, 80)}..." y temperatura ${temperature}`)
+        console.log(`[VERIFICADOR] Llamando al LLM: ${connData.provider} con System Prompt: "${systemPrompt.slice(0, 150)}..." y temperatura ${temperature}`)
+        console.log(`[VERIFICADOR] Historial de mensajes ensamblado para LLM:`, JSON.stringify(messagesPayload, null, 2))
         
         let responseText = ""
         let tokensPrompt = 0
@@ -508,6 +613,8 @@ serve(async (req) => {
           }
         }
 
+        console.log(`[VERIFICADOR] API Key del proveedor (${connData.provider}): "${connData.api_key ? connData.api_key.slice(0, 10) + '...' : 'VACÍA'}"`)
+
         try {
           if (connData.provider === 'openai' || connData.provider === 'groq' || connData.provider === 'gemini') {
             let apiUrl = 'https://api.openai.com/v1/chat/completions'
@@ -534,6 +641,8 @@ serve(async (req) => {
               })
             })
 
+            console.log(`[VERIFICADOR] API del proveedor respondió con Status HTTP: ${aiRes.status}`)
+
             if (!aiRes.ok) {
               const errorText = await aiRes.text()
               console.error(`[ERROR] La API de ${connData.provider} devolvió HTTP ${aiRes.status}:`, errorText);
@@ -541,6 +650,7 @@ serve(async (req) => {
             }
 
             const aiJson = await aiRes.json()
+            console.log(`[VERIFICADOR] JSON de respuesta de la API de ${connData.provider}:`, JSON.stringify(aiJson, null, 2))
             responseText = aiJson.choices?.[0]?.message?.content || ""
             tokensPrompt = aiJson.usage?.prompt_tokens || 0
             tokensCompletion = aiJson.usage?.completion_tokens || 0
@@ -573,6 +683,8 @@ serve(async (req) => {
               })
             })
 
+            console.log(`[VERIFICADOR] API de Claude respondió con Status HTTP: ${aiRes.status}`)
+
             if (!aiRes.ok) {
               const errorText = await aiRes.text()
               console.error(`[ERROR] La API de Claude devolvió HTTP ${aiRes.status}:`, errorText);
@@ -580,6 +692,7 @@ serve(async (req) => {
             }
 
             const aiJson = await aiRes.json()
+            console.log(`[VERIFICADOR] JSON de respuesta de la API de Claude:`, JSON.stringify(aiJson, null, 2))
             responseText = aiJson.content?.[0]?.text || ""
             tokensPrompt = aiJson.usage?.input_tokens || 0
             tokensCompletion = aiJson.usage?.output_tokens || 0

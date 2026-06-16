@@ -25,14 +25,44 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function fetchProfile(userId) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
-    setProfile(data)
-    setLoading(false)
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle()
+
+      if (data) {
+        setProfile(data)
+      } else {
+        // Self-healing: if profile doesn't exist, create it from auth session metadata
+        const { data: { session } } = await supabase.auth.getSession()
+        const authUser = session?.user
+        const newProfile = {
+          id: userId,
+          first_name: authUser?.user_metadata?.first_name || authUser?.email?.split('@')[0] || 'Usuario',
+          last_name: authUser?.user_metadata?.last_name || '',
+          timezone: 'UTC'
+        }
+        const { data: inserted, error: insertErr } = await supabase
+          .from('profiles')
+          .insert(newProfile)
+          .select()
+          .maybeSingle()
+
+        if (!insertErr && inserted) {
+          setProfile(inserted)
+        } else {
+          console.error('Error creating self-healing profile:', insertErr)
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching profile:', err)
+    } finally {
+      setLoading(false)
+    }
   }
+
 
   async function signUp({ email, password, firstName, lastName }) {
     const { data, error } = await supabase.auth.signUp({
