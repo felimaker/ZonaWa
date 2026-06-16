@@ -8,7 +8,7 @@ Describir los procedimientos para el despliegue del backend en Supabase, la conf
 ### A. Estructura de Base de Datos
 1. Accede al Panel de Control de Supabase.
 2. Ve al **SQL Editor**.
-3. Pega e inicializa el script SQL completo de [02_DATABASE_BLUEPRINT.md](file:///Users/carlos/Documents/ZonaWa/CANON/02_DATABASE_BLUEPRINT.md).
+3. Pega e inicializa el script SQL completo de [database-blueprint/spec.md](file:///Users/carlos/Documents/ZonaWa/openspec/specs/database-blueprint/spec.md).
 
 ### B. Despliegue de Edge Functions
 Utiliza la CLI de Supabase para subir las funciones de orquestación (Webhook):
@@ -87,7 +87,7 @@ Este comando generará el directorio `/dist` que contiene el HTML, JS y CSS opti
 
 ### Pasos para Despliegue en Vercel:
 1. Conecta tu repositorio de GitHub a Vercel.
-2. Agrega las variables de entorno configuradas en [09_ENV_VARIABLES.md](file:///Users/carlos/Documents/ZonaWa/CANON/09_ENV_VARIABLES.md) en el panel de Vercel.
+2. Agrega las variables de entorno configuradas en [env-variables/spec.md](file:///Users/carlos/Documents/ZonaWa/openspec/specs/env-variables/spec.md) en el panel de Vercel.
 3. Vercel detectará la configuración de Vite y compilará la aplicación automáticamente con cada commit realizado a la rama `main`.
 
 ## Requirements

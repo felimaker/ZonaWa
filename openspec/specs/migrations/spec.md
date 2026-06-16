@@ -12,7 +12,7 @@ Este documento define la estructura y el control de versiones de la base de dato
 Para garantizar la estabilidad y la consistencia en todos los entornos (desarrollo, pruebas y producción), seguimos un enfoque de **migraciones incrementales basadas en código**:
 
 1. **Inmutabilidad:** Las migraciones ya ejecutadas nunca deben ser modificadas directamente en su archivo original. Cualquier cambio posterior (añadir columnas, modificar restricciones, etc.) debe ser una nueva migración con un número de versión secuencial.
-2. **Numeración Secuencial:** Cada archivo de migración reside en la carpeta `database/migrations/` (o se documenta aquí secuencialmente) con el formato `V[Version]__[Nombre_Descriptivo].sql` (ej. `V1.0.0__esquema_inicial.sql`).
+2. **Numeración Secuencial:** Cada archivo de migración reside en la carpeta `supabase/migrations/` (o se documenta aquí secuencialmente) con el formato `V[Version]__[Nombre_Descriptivo].sql` (ej. `V1.0.0__esquema_inicial.sql`).
 3. **Estrategia de Rollback:** Cada migración debe planificarse con un script de reversión (Rollback) documentado para deshacer los cambios en caso de fallos críticos durante el despliegue.
 
 ---
@@ -21,7 +21,7 @@ Para garantizar la estabilidad y la consistencia en todos los entornos (desarrol
 
 La versión **v1.0.0** representa el punto de partida completo del proyecto e inicializa el modelo relacional, las políticas RLS y los triggers de negocio.
 
-- **Archivo Fuente:** [schema.sql](file:///Users/carlos/Documents/ZonaWa/database/schema.sql)
+- **Archivo Fuente:** [database-blueprint/spec.md](file:///Users/carlos/Documents/ZonaWa/openspec/specs/database-blueprint/spec.md)
 - **Fecha de Creación:** 2026-06-03
 - **Estado:** Pendiente de ejecución en producción.
 
@@ -51,7 +51,7 @@ Para reparar los errores de carga en el frontend (códigos 404 en endpoints de S
 1. Abre el panel de control de Supabase de este proyecto: [Dashboard Supabase - bekqrkvuwloicbuygdia](https://supabase.com/dashboard/project/bekqrkvuwloicbuygdia).
 2. Ve a la barra lateral izquierda y haz clic en **SQL Editor**.
 3. Haz clic en **New Query**.
-4. Abre localmente el archivo [schema.sql](file:///Users/carlos/Documents/ZonaWa/database/schema.sql) y copia su contenido completo.
+4. Copia el contenido SQL de [database-blueprint/spec.md](file:///Users/carlos/Documents/ZonaWa/openspec/specs/database-blueprint/spec.md).
 5. Pégalo en el editor de SQL y haz clic en el botón **Run** (esquina inferior derecha).
 6. Verifica que la consola indique "Success. No rows returned."
 
@@ -64,7 +64,7 @@ supabase start
 # Crear un archivo de migración vacío
 supabase migration new esquema_inicial
 
-# Copiar el contenido de database/schema.sql al archivo recién creado en supabase/migrations/
+# Copiar el contenido SQL de la especificación database-blueprint al archivo recién creado en supabase/migrations/
 # Y finalmente aplicar las migraciones localmente:
 supabase db reset
 ```
@@ -78,7 +78,7 @@ Cuando sea necesario realizar cambios estructurales (por ejemplo, añadir un nue
 ### Paso 1: Diseño de la Migración
 Crea un archivo SQL secuencial con las modificaciones. Ejemplo de contenido para añadir una columna:
 ```sql
--- database/migrations/V1.1.0__add_model_name_to_bot_configurations.sql
+-- supabase/migrations/V1.1.0__add_model_name_to_bot_configurations.sql
 -- Propósito: Añadir selección de modelo específico al bot.
 
 ALTER TABLE public.bot_configurations 

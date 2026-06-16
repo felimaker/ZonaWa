@@ -12,12 +12,12 @@ import {
 } from 'lucide-react'
 
 const STATUS_CONFIG = {
-  CONNECTED:    { label: 'Conectado',    color: 'success', icon: Wifi },
-  WAITING_QR:   { label: 'Esperando QR', color: 'warning', icon: QrCode },
-  DISCONNECTED: { label: 'Desconectado', color: 'danger',  icon: WifiOff },
-  ERROR:        { label: 'Error',        color: 'danger',  icon: WifiOff },
-  PAUSED:       { label: 'Pausado',      color: 'warning', icon: WifiOff },
-  CREATED:      { label: 'Creado',       color: 'info',    icon: Smartphone },
+  CONNECTED: { label: 'Conectado', color: 'success', icon: Wifi },
+  WAITING_QR: { label: 'Esperando QR', color: 'warning', icon: QrCode },
+  DISCONNECTED: { label: 'Desconectado', color: 'danger', icon: WifiOff },
+  ERROR: { label: 'Error', color: 'danger', icon: WifiOff },
+  PAUSED: { label: 'Pausado', color: 'warning', icon: WifiOff },
+  CREATED: { label: 'Creado', color: 'info', icon: Smartphone },
 }
 
 const PROVIDER_MODELS = {
@@ -37,13 +37,6 @@ const PROVIDER_MODELS = {
   groq: [
     { id: 'llama3-8b-8192', label: 'Llama 3 8B' },
     { id: 'llama3-70b-8192', label: 'Llama 3 70B' }
-  ],
-  deepseek: [
-    { id: 'deepseek-chat', label: 'DeepSeek Chat' }
-  ],
-  openrouter: [
-    { id: 'meta-llama/llama-3.1-8b-instruct:free', label: 'Llama 3.1 8B Free' },
-    { id: 'google/gemma-2-9b-it:free', label: 'Gemma 2 9B Free' }
   ]
 }
 
@@ -58,13 +51,13 @@ const AVAILABLE_RULES = [
 
 function mapEvolutionStateToDbStatus(stateRes) {
   const state = (
-    stateRes?.instance?.state || 
-    stateRes?.instance?.status || 
-    stateRes?.connectionStatus || 
-    stateRes?.status || 
+    stateRes?.instance?.state ||
+    stateRes?.instance?.status ||
+    stateRes?.connectionStatus ||
+    stateRes?.status ||
     ''
   ).toLowerCase()
-  
+
   if (state === 'open' || state === 'connected') {
     return 'CONNECTED'
   }
@@ -78,23 +71,23 @@ export default function Numbers() {
   const { user } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate()
-  
+
   const [numbers, setNumbers] = useState([])
   const [loading, setLoading] = useState(true)
-  
+
   // Realtime active status toggles
   const [togglingId, setTogglingId] = useState(null)
   const [qrModal, setQrModal] = useState(null) // { id, session_name, qr }
-  
+
   // Validation modal (before toggling bot)
   const [validationModal, setValidationModal] = useState({ open: false, errors: [], number: null })
-  
+
   // Onboarding Wizard Modal state
   const [onboardingModal, setOnboardingModal] = useState(false)
   const [onboardingStep, setOnboardingStep] = useState(1)
   const [onboardingNumberId, setOnboardingNumberId] = useState(null) // null means creating new
   const [onboardingConfig, setOnboardingConfig] = useState(null)
-  
+
   // Onboarding Step 1: Instance Data
   const [instanceDisplayName, setInstanceDisplayName] = useState('')
   const [instanceSessionName, setInstanceSessionName] = useState('')
@@ -102,11 +95,11 @@ export default function Numbers() {
   const [qrCode, setQrCode] = useState('')
   const [creatingInstanceLoader, setCreatingInstanceLoader] = useState(false)
   const [loadingQrLoader, setLoadingQrLoader] = useState(false)
-  
+
   // Onboarding Step 2: AI Connections
   const [connections, setConnections] = useState([])
   const [selectedConnId, setSelectedConnId] = useState('')
-  
+
   // Onboarding Step 2: Add inline AI connection
   const [showNewConnForm, setShowNewConnForm] = useState(false)
   const [newConnProvider, setNewConnProvider] = useState('openai')
@@ -114,7 +107,7 @@ export default function Numbers() {
   const [newConnApiKey, setNewConnApiKey] = useState('')
   const [creatingConn, setCreatingConn] = useState(false)
   const [traffic, setTraffic] = useState({})
-  
+
   // Details Modal state
   const [detailsModal, setDetailsModal] = useState(false)
   const [detailsNumber, setDetailsNumber] = useState(null)
@@ -127,7 +120,7 @@ export default function Numbers() {
   const [activeChat, setActiveChat] = useState(null)
   const [replyText, setReplyText] = useState('')
   const [sendingReply, setSendingReply] = useState(false)
-  
+
   // Onboarding Step 3: Agent Configuration
   const [agentForm, setAgentForm] = useState({
     name: '',
@@ -148,7 +141,7 @@ export default function Numbers() {
   const [triggerInput, setTriggerInput] = useState('')
   const [handoffInput, setHandoffInput] = useState('')
   const [savingOnboarding, setSavingOnboarding] = useState(false)
-  
+
   // Personality Modal state
   const [personalityModal, setPersonalityModal] = useState(false)
   const [personalityNumber, setPersonalityNumber] = useState(null)
@@ -195,7 +188,7 @@ export default function Numbers() {
             .select('number_id')
             .eq('id', payload.new.conversation_id)
             .single()
-          
+
           if (conv) {
             setTraffic(prev => {
               const current = prev[conv.number_id] || { totalCount: 0, lastMessage: null, pulse: false }
@@ -212,7 +205,7 @@ export default function Numbers() {
                 }
               }
             })
-            
+
             // Turn off pulse animation after 1s
             setTimeout(() => {
               setTraffic(prev => {
@@ -357,7 +350,7 @@ export default function Numbers() {
       }, (payload) => {
         console.log("🔥 [REALTIME] Nuevo mensaje detectado:", payload.new)
         const newMsg = payload.new
-        
+
         setDetailsConversations(prev => {
           let updated = false
           const next = prev.map(c => {
@@ -366,7 +359,7 @@ export default function Numbers() {
               const existingMsgs = c.messages || []
               const alreadyExists = existingMsgs.some(m => m.id === newMsg.id || (m.whatsapp_message_id && m.whatsapp_message_id === newMsg.whatsapp_message_id))
               const newMsgs = alreadyExists ? existingMsgs : [...existingMsgs, newMsg]
-              
+
               setActiveChat(chat => {
                 if (chat && chat.id === c.id) {
                   const chatMsgs = chat.messages || []
@@ -442,7 +435,7 @@ export default function Numbers() {
           .from('messages')
           .select('*, conversations!inner(number_id)', { count: 'exact', head: true })
           .eq('conversations.number_id', num.id)
-        
+
         // Query last message for this number
         const { data: lastMsgData } = await supabase
           .from('messages')
@@ -451,7 +444,7 @@ export default function Numbers() {
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle()
-        
+
         initialTraffic[num.id] = {
           totalCount: count || 0,
           lastMessage: lastMsgData ? {
@@ -482,17 +475,17 @@ export default function Numbers() {
   async function openPersonalityModal(number) {
     setPersonalityNumber(number)
     setLoading(true)
-    
+
     // Fetch fresh bot configuration
     const { data: config } = await supabase
       .from('bot_configurations')
       .select('*, agents(*)')
       .eq('number_id', number.id)
       .maybeSingle()
-      
+
     setPersonalityConfig(config)
     await fetchSavedAgents()
-    
+
     if (config) {
       const agent = config.agents
       if (agent) {
@@ -566,7 +559,7 @@ export default function Numbers() {
       toast({ message: 'Por favor, completa el nombre y prompt de rol del agente.', type: 'warning' })
       return
     }
-    
+
     setSavingPersonality(true)
     try {
       const agentPayload = {
@@ -578,9 +571,9 @@ export default function Numbers() {
         temperature: parseFloat(personalityForm.temperature),
         max_tokens: parseInt(personalityForm.max_tokens),
       }
-      
+
       let finalAgentId = selectedAgentId
-      
+
       if (selectedAgentId === 'new' || saveAsNewTemplate) {
         const { data: newAgent, error: insErr } = await supabase
           .from('agents')
@@ -596,7 +589,7 @@ export default function Numbers() {
           .eq('id', selectedAgentId)
         if (updErr) throw updErr
       }
-      
+
       const { error: botUpdErr } = await supabase
         .from('bot_configurations')
         .update({
@@ -605,7 +598,7 @@ export default function Numbers() {
         })
         .eq('number_id', personalityNumber.id)
       if (botUpdErr) throw botUpdErr
-      
+
       toast({ message: 'Estilo IA guardado correctamente.', type: 'success' })
       setPersonalityModal(false)
       fetchNumbers()
@@ -649,7 +642,7 @@ export default function Numbers() {
       if (activeCount >= 5) {
         toast({ message: 'Límite excedido: máximo 5 bots activos.', type: 'warning' }); return
       }
-      
+
       setTogglingId(number.id)
       const { data: config, error: configErr } = await supabase
         .from('bot_configurations')
@@ -657,7 +650,7 @@ export default function Numbers() {
         .eq('number_id', number.id)
         .maybeSingle()
       setTogglingId(null)
-      
+
       const errors = []
       if (configErr || !config) {
         errors.push("No se ha configurado el Agente de IA para este número.")
@@ -676,16 +669,16 @@ export default function Numbers() {
           }
         }
       }
-      
+
       if (errors.length > 0) {
         setValidationModal({ open: true, errors, number })
         return
       }
     }
-    
+
     // Enable/Disable normally
     setTogglingId(number.id)
-    
+
     // Self-healing webhook: always ensure the webhook is set correctly when enabling the bot
     if (!number.bot_enabled) {
       try {
@@ -719,14 +712,14 @@ export default function Numbers() {
       if (!isConnected) {
         loadOnboardingQr(existingNumber.session_name)
       }
-      
+
       // Load configurations
       const { data: config } = await supabase
         .from('bot_configurations')
         .select('*, agents(*)')
         .eq('number_id', existingNumber.id)
         .maybeSingle()
-      
+
       setOnboardingConfig(config || null)
       if (config) {
         setSelectedConnId(config.connection_id || '')
@@ -792,7 +785,7 @@ export default function Numbers() {
         continue_ai_after_manual: false
       })
     }
-    
+
     // Fetch connections list to be fresh
     fetchConnections()
     setOnboardingModal(true)
@@ -807,27 +800,27 @@ export default function Numbers() {
     setCreatingInstanceLoader(true)
     const sessionName = `zonawa_${user.id.slice(0, 8)}_${Date.now()}`
     setInstanceSessionName(sessionName)
-    
+
     // Generar un token secreto de 16 caracteres hexadecimales localmente
-    const webhookSecret = Array.from({length: 16}, () => Math.floor(Math.random()*16).toString(16)).join('');
-    
+    const webhookSecret = Array.from({ length: 16 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+
     try {
       await createInstance(sessionName)
       await setWebhook(sessionName, `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook?secret=${webhookSecret}`)
-      
+
       const { data, error } = await supabase.from('whatsapp_numbers').insert({
-        user_id: user.id, 
-        display_name: instanceDisplayName, 
-        session_name: sessionName, 
+        user_id: user.id,
+        display_name: instanceDisplayName,
+        session_name: sessionName,
         status: 'WAITING_QR',
         webhook_secret: webhookSecret
       }).select().single()
-      
+
       if (error) throw error
       setOnboardingNumberId(data.id)
       setNumbers(prev => [{ ...data }, ...prev])
       setInstanceStatus('WAITING_QR')
-      
+
       // Load QR
       await loadOnboardingQr(sessionName)
     } catch (err) {
@@ -854,7 +847,7 @@ export default function Numbers() {
     const session = instanceSessionName
     const numberId = onboardingNumberId
     if (!session || !numberId) return
-    
+
     setLoadingQrLoader(true)
     try {
       const stateRes = await getConnectionState(session)
@@ -932,7 +925,7 @@ export default function Numbers() {
         })
         .select()
         .single()
-      
+
       if (error) throw error
       toast({ message: 'Proveedor de IA vinculado correctamente', type: 'success' })
       setSelectedConnId(data.id)
@@ -960,7 +953,7 @@ export default function Numbers() {
     if (!selectedOnboardingAgentId) {
       toast({ message: 'Por favor, selecciona o crea un Estilo IA', type: 'warning' }); return
     }
-    
+
     setSavingOnboarding(true)
     try {
       let agentId = selectedOnboardingAgentId
@@ -999,7 +992,7 @@ export default function Numbers() {
         continue_ai_after_manual: agentForm.continue_ai_after_manual,
         updated_at: new Date().toISOString(),
       }
-      
+
       if (onboardingConfig) {
         await supabase.from('bot_configurations').update(botPayload).eq('id', onboardingConfig.id)
       } else {
@@ -1009,7 +1002,7 @@ export default function Numbers() {
       // 3. Auto-enable the bot
       await supabase.from('whatsapp_numbers').update({ bot_enabled: true }).eq('id', onboardingNumberId)
       setNumbers(prev => prev.map(n => n.id === onboardingNumberId ? { ...n, bot_enabled: true } : n))
-      
+
       // Ensure webhook is correctly set in Evolution API
       try {
         const numberObj = numbers.find(n => n.id === onboardingNumberId)
@@ -1035,7 +1028,7 @@ export default function Numbers() {
     if (!confirm(`¿Eliminar "${number.display_name}"? Esta acción no se puede deshacer.`)) return
     try {
       await logoutInstance(number.session_name)
-    } catch (_) {}
+    } catch (_) { }
     const { error } = await supabase.from('whatsapp_numbers').delete().eq('id', number.id)
     if (error) toast({ message: error.message, type: 'error' })
     else setNumbers(prev => prev.filter(n => n.id !== number.id))
@@ -1060,7 +1053,7 @@ export default function Numbers() {
     setDetailsMetrics({ clientMsgs: 0, botMsgs: 0, totalMsgs: 0, promptTokens: 0, completionTokens: 0, cost: 0 })
     setActiveChat(null)
     setReplyText('')
-    
+
     try {
       console.log("=== INICIO CARGA DETALLES DE TRÁFICO ===")
       console.log("Número a consultar:", number)
@@ -1072,13 +1065,13 @@ export default function Numbers() {
         .eq('number_id', number.id)
         .order('last_message_at', { ascending: false })
         .limit(4)
-        
+
       if (convErr) {
         console.error("Error al obtener conversaciones:", convErr)
         throw convErr
       }
       console.log("Conversaciones obtenidas:", convs)
-      
+
       const mappedConvs = (convs || []).map(c => {
         const sortedMsgs = (c.messages || []).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         return {
@@ -1087,13 +1080,13 @@ export default function Numbers() {
         }
       })
       setDetailsConversations(mappedConvs)
-      
+
       // 2. Fetch total messages count for metrics
       const { data: msgsCountData, error: msgsCountErr } = await supabase
         .from('messages')
         .select('sender, conversations!inner(number_id)')
         .eq('conversations.number_id', number.id)
-      
+
       if (msgsCountErr) {
         console.error("Error al obtener conteo de mensajes:", msgsCountErr)
       } else {
@@ -1106,7 +1099,7 @@ export default function Numbers() {
         if (m.sender === 'customer') clientMsgCount++
         else if (m.sender === 'bot') botMsgCount++
       })
-      
+
       // 3. Fetch financial usage metrics from usage_logs
       const { data: logsData, error: logsErr } = await supabase
         .from('usage_logs')
@@ -1118,7 +1111,7 @@ export default function Numbers() {
       } else {
         console.log("Logs de consumo obtenidos:", logsData)
       }
-        
+
       let totalPromptTokens = 0
       let totalCompletionTokens = 0
       let totalCost = 0
@@ -1127,7 +1120,7 @@ export default function Numbers() {
         totalCompletionTokens += l.tokens_completion
         totalCost += parseFloat(l.estimated_cost || 0)
       })
-      
+
       setDetailsMetrics({
         clientMsgs: clientMsgCount,
         botMsgs: botMsgCount,
@@ -1145,7 +1138,7 @@ export default function Numbers() {
           .eq('number_id', number.id)
           .order('created_at', { ascending: false })
           .limit(10)
-        
+
         if (auditErr) {
           console.error("Error al obtener bitácora de auditoría:", auditErr)
         } else {
@@ -1158,7 +1151,7 @@ export default function Numbers() {
       } catch (auditFetchErr) {
         console.warn("Fallo al obtener bitácora de auditoría:", auditFetchErr)
       }
-      
+
       console.log("=== FIN CARGA DETALLES DE TRÁFICO ===")
     } catch (err) {
       console.error("Excepción en openDetailsModal:", err)
@@ -1174,7 +1167,7 @@ export default function Numbers() {
       .from('conversations')
       .update({ status: newStatus })
       .eq('id', convId)
-      
+
     if (error) {
       toast({ message: error.message, type: 'error' })
     } else {
@@ -1217,9 +1210,9 @@ export default function Numbers() {
 
       if (handoffErr) throw handoffErr
 
-      toast({ 
-        message: continueAi ? 'Mensaje enviado. El bot continuará activo.' : 'Mensaje enviado y bot pausado para este chat.', 
-        type: 'success' 
+      toast({
+        message: continueAi ? 'Mensaje enviado. El bot continuará activo.' : 'Mensaje enviado y bot pausado para este chat.',
+        type: 'success'
       })
       setReplyText('')
 
@@ -1280,8 +1273,8 @@ export default function Numbers() {
       <div className="page">
         <div className="page-header" style={{ marginBottom: '16px' }}>
           <div>
-            <button 
-              className="btn-outline btn-sm" 
+            <button
+              className="btn-outline btn-sm"
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '16px' }}
               onClick={() => setPersonalityModal(false)}
             >
@@ -1296,7 +1289,7 @@ export default function Numbers() {
           <div className="loading-state"><Loader2 size={32} className="spin" /></div>
         ) : (
           <form onSubmit={handleSavePersonality} className="settings-form" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            
+
             {/* Selección de Plantilla Guardada */}
             <div className="glass-card settings-section" style={{ padding: '20px' }}>
               <h2 className="section-title">Perfil / Plantilla de Estilo IA</h2>
@@ -1340,7 +1333,7 @@ export default function Numbers() {
                   required
                 />
               </div>
-              
+
               {personalityConfig?.connection_id && (
                 <div className="form-group">
                   <label>Modelo de IA</label>
@@ -1373,8 +1366,8 @@ export default function Numbers() {
                 {AVAILABLE_RULES.map(rule => {
                   const isActive = (personalityForm.rules || []).includes(rule.key)
                   return (
-                    <div 
-                      key={rule.key} 
+                    <div
+                      key={rule.key}
                       onClick={() => {
                         setPersonalityForm(prev => {
                           const currentRules = prev.rules || []
@@ -1527,12 +1520,12 @@ export default function Numbers() {
                 </div>
 
                 {/* Monitor de Tráfico en Tiempo Real */}
-                <div 
-                  className="traffic-monitor" 
-                  style={{ 
-                    borderTop: '1px solid var(--border)', 
+                <div
+                  className="traffic-monitor"
+                  style={{
+                    borderTop: '1px solid var(--border)',
                     borderBottom: '1px solid var(--border)',
-                    padding: '12px 16px', 
+                    padding: '12px 16px',
                     background: 'rgba(255, 255, 255, 0.01)',
                     display: 'flex',
                     flexDirection: 'column',
@@ -1613,7 +1606,7 @@ export default function Numbers() {
                           <RefreshCw size={13} /> Reconfigurar
                         </button>
                       )}
-                      
+
                       {/* Botón de Estilo de IA, visible siempre que esté configurado */}
                       <button className="btn-outline btn-sm" style={{ marginLeft: '6px' }} onClick={() => openPersonalityModal(number)}>
                         <Sparkles size={13} style={{ color: 'var(--warning)' }} /> Estilo IA
@@ -1638,9 +1631,9 @@ export default function Numbers() {
                         handleToggleBot(number)
                       }}
                       disabled={togglingId === number.id}
-                      style={{ 
-                        opacity: !number.bot_enabled && number.status !== 'CONNECTED' ? 0.5 : 1, 
-                        cursor: !number.bot_enabled && number.status !== 'CONNECTED' ? 'not-allowed' : 'pointer' 
+                      style={{
+                        opacity: !number.bot_enabled && number.status !== 'CONNECTED' ? 0.5 : 1,
+                        cursor: !number.bot_enabled && number.status !== 'CONNECTED' ? 'not-allowed' : 'pointer'
                       }}
                     >
                       <span className="toggle-knob" />
@@ -1660,7 +1653,7 @@ export default function Numbers() {
             <AlertCircle size={24} />
             <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '600' }}>Faltan Parámetros Obligatorios</h3>
           </div>
-          
+
           <p style={{ fontSize: '0.85rem', color: 'var(--text-2)', margin: 0 }}>
             Para activar el asistente virtual en "{validationModal.number?.display_name}", debes resolver las siguientes alertas:
           </p>
@@ -1705,9 +1698,9 @@ export default function Numbers() {
               <div className="pulse-dot" />
               <span>Esperando escaneo…</span>
             </div>
-            <button 
-              type="button" 
-              className="btn-primary btn-sm" 
+            <button
+              type="button"
+              className="btn-primary btn-sm"
               onClick={forceVerifyModalConnection}
               disabled={loadingQrLoader}
               style={{ width: '100%', marginTop: '6px' }}
@@ -1720,7 +1713,7 @@ export default function Numbers() {
 
       {/* Onboarding Wizard Modal */}
       <Modal open={onboardingModal} onClose={() => setOnboardingModal(false)} title="Asistente de Onboarding de Número" size="md">
-        
+
         {/* Step Indicator Header */}
         <div className="wizard-steps">
           <div className={`wizard-step ${onboardingStep === 1 ? 'active' : ''} ${onboardingStep > 1 ? 'completed' : ''}`}>
@@ -1780,7 +1773,7 @@ export default function Numbers() {
                       <p style={{ fontSize: '0.78rem', color: 'var(--text-3)', textAlign: 'center', margin: 0 }}>
                         Escanea el código QR desde tu celular. El asistente se actualizará automáticamente en tiempo real.
                       </p>
-                      
+
                       {qrCode ? (
                         <div className="qr-wrapper">
                           <img src={qrCode.startsWith('data:') ? qrCode : `data:image/png;base64,${qrCode}`} alt="QR WhatsApp" className="qr-image" style={{ width: '180px', height: '180px' }} />
@@ -1791,7 +1784,7 @@ export default function Numbers() {
                           <p style={{ fontSize: '0.78rem' }}>Cargando QR…</p>
                         </div>
                       )}
-                      
+
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button type="button" className="btn-outline btn-xs" onClick={() => loadOnboardingQr(instanceSessionName)} disabled={loadingQrLoader}>
                           <RefreshCw size={10} className={loadingQrLoader ? 'spin' : ''} /> Regenerar QR
@@ -1804,9 +1797,9 @@ export default function Numbers() {
                   )}
 
                   <div className="modal-footer" style={{ width: '100%', display: 'flex', justifyContent: 'flex-end', marginTop: '16px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
-                    <button 
-                      type="button" 
-                      className="btn-primary" 
+                    <button
+                      type="button"
+                      className="btn-primary"
                       onClick={() => setOnboardingStep(2)}
                       disabled={instanceStatus !== 'CONNECTED'}
                     >
@@ -1823,7 +1816,7 @@ export default function Numbers() {
         {onboardingStep === 2 && (
           <div className="wizard-content">
             <h3 style={{ fontSize: '0.95rem', fontWeight: '600', color: 'var(--text-1)', marginBottom: '12px' }}>Selecciona un Proveedor de IA Activo</h3>
-            
+
             {/* List existing connections */}
             <div className="radio-cards-grid">
               {connections.map(conn => (
@@ -1936,7 +1929,7 @@ export default function Numbers() {
         {onboardingStep === 3 && (
           <div className="wizard-content" style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: '4px' }}>
             <form onSubmit={handleOnboardingComplete} className="modal-form" style={{ gap: '16px' }}>
-              
+
               {/* Selección de Estilo IA */}
               <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: '8px' }}>
                 <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-1)' }}>Estilo IA (Plantilla del Agente)</h4>
@@ -1988,8 +1981,8 @@ export default function Numbers() {
                 <div style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '0.8rem', color: 'var(--text-2)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div><strong style={{ color: 'var(--text-1)' }}>System Prompt:</strong> {agentForm.role_prompt}</div>
                   <div>
-                    <strong style={{ color: 'var(--text-1)' }}>Modelo:</strong> {agentForm.model} · 
-                    <strong style={{ color: 'var(--text-1)' }}> Temp:</strong> {agentForm.temperature} · 
+                    <strong style={{ color: 'var(--text-1)' }}>Modelo:</strong> {agentForm.model} ·
+                    <strong style={{ color: 'var(--text-1)' }}> Temp:</strong> {agentForm.temperature} ·
                     <strong style={{ color: 'var(--text-1)' }}> Max Tokens:</strong> {agentForm.max_tokens}
                   </div>
                   <div>
@@ -2085,8 +2078,8 @@ export default function Numbers() {
                       {AVAILABLE_RULES.map(rule => {
                         const isActive = (agentForm.rules || []).includes(rule.key)
                         return (
-                          <div 
-                            key={rule.key} 
+                          <div
+                            key={rule.key}
                             onClick={() => toggleRuleOnboarding(rule.key)}
                             style={{
                               display: 'flex',
@@ -2118,7 +2111,7 @@ export default function Numbers() {
               {/* Modo de Activación & Triggers */}
               <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: '8px' }}>
                 <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-1)' }}>Reglas de Activación</h4>
-                
+
                 <div className="form-group">
                   <label>Modo de Activación</label>
                   <div className="radio-cards-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
@@ -2201,7 +2194,7 @@ export default function Numbers() {
               {/* Filtros de Destinatarios */}
               <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: '8px' }}>
                 <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-1)' }}>Filtros de Destinatarios</h4>
-                
+
                 <div className="form-group">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: '6px', border: '1px solid var(--border)' }}>
                     <div>
@@ -2277,7 +2270,7 @@ export default function Numbers() {
           <div className="loading-state" style={{ padding: '40px 0' }}><Loader2 size={32} className="spin" /></div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            
+
             {/* Cabecera del Estado */}
             <div style={{ display: 'flex', gap: '16px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', padding: '12px 16px', borderRadius: '8px', flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: '150px' }}>
@@ -2301,7 +2294,7 @@ export default function Numbers() {
               <h4 style={{ margin: '0 0 12px 0', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Activity size={14} style={{ color: 'var(--primary)' }} /> Métricas de Tráfico y Consumo
               </h4>
-              
+
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
                 {/* Caja: Mensajes Totales */}
                 <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', padding: '12px', borderRadius: '8px' }}>
@@ -2313,10 +2306,10 @@ export default function Numbers() {
                   </div>
                   {/* Progress bar */}
                   <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', marginTop: '6px', overflow: 'hidden' }}>
-                    <div style={{ 
-                      height: '100%', 
-                      background: 'var(--primary)', 
-                      width: detailsMetrics.totalMsgs > 0 ? `${(detailsMetrics.botMsgs / detailsMetrics.totalMsgs) * 100}%` : '0%' 
+                    <div style={{
+                      height: '100%',
+                      background: 'var(--primary)',
+                      width: detailsMetrics.totalMsgs > 0 ? `${(detailsMetrics.botMsgs / detailsMetrics.totalMsgs) * 100}%` : '0%'
                     }} />
                   </div>
                 </div>
@@ -2362,9 +2355,9 @@ export default function Numbers() {
                         {activeChat.status === 'BOT' ? 'Bot Activo' : 'Manual'}
                       </span>
                     </div>
-                    <button 
-                      type="button" 
-                      className="btn-outline btn-sm" 
+                    <button
+                      type="button"
+                      className="btn-outline btn-sm"
                       onClick={() => setActiveChat(null)}
                       style={{ padding: '4px 8px', fontSize: '0.72rem' }}
                     >
@@ -2377,9 +2370,9 @@ export default function Numbers() {
                     {((activeChat.messages || []).slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at))).map((m, idx) => {
                       const isMe = m.sender === 'agent' || m.sender === 'bot';
                       return (
-                        <div 
-                          key={idx} 
-                          style={{ 
+                        <div
+                          key={idx}
+                          style={{
                             alignSelf: isMe ? 'flex-end' : 'flex-start',
                             background: isMe ? 'var(--primary-dim)' : 'rgba(255,255,255,0.03)',
                             border: '1px solid ' + (isMe ? 'rgba(99,102,241,0.2)' : 'var(--border)'),
@@ -2408,7 +2401,7 @@ export default function Numbers() {
                   </div>
 
                   {/* Chat Input */}
-                  <form 
+                  <form
                     onSubmit={(e) => {
                       e.preventDefault();
                       handleSendDirectMessage(activeChat.id, activeChat.customer_phone, replyText);
@@ -2423,9 +2416,9 @@ export default function Numbers() {
                       disabled={sendingReply}
                       style={{ fontSize: '0.75rem', padding: '6px 10px', height: '34px', background: 'rgba(0,0,0,0.15)', flex: 1 }}
                     />
-                    <button 
-                      type="submit" 
-                      className="btn-primary btn-sm" 
+                    <button
+                      type="submit"
+                      className="btn-primary btn-sm"
                       disabled={!replyText.trim() || sendingReply}
                       style={{ height: '34px', width: '38px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
                     >
@@ -2445,7 +2438,7 @@ export default function Numbers() {
                           </strong>
                           <span style={{ fontSize: '0.72rem', color: 'var(--text-3)' }}>({conv.customer_phone})</span>
                         </div>
-                        
+
                         {conv.lastMessage ? (
                           <p style={{ fontSize: '0.72rem', color: 'var(--text-2)', margin: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                             <strong style={{ color: conv.lastMessage.sender === 'customer' ? 'var(--primary)' : conv.lastMessage.sender === 'bot' ? 'var(--success)' : 'var(--warning)' }}>
@@ -2463,8 +2456,8 @@ export default function Numbers() {
                           {conv.status === 'BOT' ? 'Bot' : 'Manual'}
                         </span>
 
-                        <button 
-                          type="button" 
+                        <button
+                          type="button"
                           className="btn-outline btn-xs"
                           onClick={() => setActiveChat(conv)}
                           style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
@@ -2472,8 +2465,8 @@ export default function Numbers() {
                           Chatear
                         </button>
 
-                        <button 
-                          type="button" 
+                        <button
+                          type="button"
                           className={`btn-outline btn-xs`}
                           style={{ borderColor: conv.status === 'BOT' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(16, 185, 129, 0.3)' }}
                           onClick={() => toggleConversationHandoff(conv.id, conv.status)}
@@ -2483,7 +2476,7 @@ export default function Numbers() {
                       </div>
                     </div>
                   ))}
-                  
+
                   {detailsConversations.length === 0 && (
                     <p className="empty-state" style={{ margin: 0, padding: '24px 0', fontSize: '0.8rem', fontStyle: 'italic' }}>
                       No hay conversaciones registradas en este número de WhatsApp.
@@ -2498,13 +2491,13 @@ export default function Numbers() {
               <h4 style={{ margin: '0 0 12px 0', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Sparkles size={14} style={{ color: 'var(--warning)' }} /> Bitácora de Auditoría de IA (Últimos Eventos)
               </h4>
-              
-              <div 
-                style={{ 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  gap: '8px', 
-                  maxHeight: '170px', 
+
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  maxHeight: '170px',
                   overflowY: 'auto',
                   background: 'rgba(0,0,0,0.15)',
                   padding: '12px',
@@ -2515,7 +2508,7 @@ export default function Numbers() {
                 {detailsAuditLogs.map(log => {
                   let badgeColor = 'info'
                   let eventLabel = log.event_type
-                  
+
                   if (log.event_type === 'AI_RESPONSE') {
                     badgeColor = 'success'
                     eventLabel = 'Respuesta IA'
@@ -2541,7 +2534,7 @@ export default function Numbers() {
                     badgeColor = 'warning'
                     eventLabel = 'Pausado por Humano'
                   }
-                  
+
                   return (
                     <div key={log.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px', fontSize: '0.72rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2558,7 +2551,7 @@ export default function Numbers() {
                     </div>
                   )
                 })}
-                
+
                 {detailsAuditLogs.length === 0 && (
                   <p style={{ margin: 0, padding: '12px 0', fontSize: '0.75rem', color: 'var(--text-3)', fontStyle: 'italic', textAlign: 'center' }}>
                     Sin eventos registrados. Asegúrate de ejecutar la migración SQL para habilitar el reporte de auditoría.

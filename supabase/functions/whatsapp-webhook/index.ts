@@ -58,7 +58,7 @@ serve(async (req) => {
 
     const urlParams = new URL(req.url).searchParams
     const incomingSecret = urlParams.get('secret')
-    
+
     if (numData.webhook_secret && numData.webhook_secret !== incomingSecret) {
       console.error(`[ERROR] Token secreto inválido en el webhook para la sesión ${instance}. Recibido: ${incomingSecret}`);
       return new Response(JSON.stringify({ error: 'Unauthorized: Invalid webhook secret' }), {
@@ -73,7 +73,7 @@ serve(async (req) => {
     if (eventLower === 'connection.update') {
       const state = data?.state
       const phone = data?.phone || data?.number || ""
-      
+
       let dbStatus = 'DISCONNECTED'
       if (state === 'open') {
         dbStatus = 'CONNECTED'
@@ -112,32 +112,32 @@ serve(async (req) => {
       const messageData = data?.message
       const key = data?.key
       const fromMe = key?.fromMe
-      
+
       if (fromMe) {
         const messageId = key?.id
         console.log(`[VERIFICADOR] Mensaje saliente detectado (fromMe = true), ID: ${messageId}`);
-        
+
         // Comprobar si el mensaje ya existe en Supabase (evitar duplicar del Bot o Panel)
         const { data: existingMsg, error: existErr } = await supabase
           .from('messages')
           .select('id')
           .eq('whatsapp_message_id', messageId)
           .maybeSingle()
-        
+
         if (existingMsg) {
           console.log("[OK] El mensaje ya existe en la base de datos (enviado por Bot o Panel). Omitiendo.");
           return new Response(JSON.stringify({ success: true, ignored: true }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           })
         }
-        
+
         // Si no existe, es un mensaje manual del operador desde su celular
-        let textContent = messageData?.conversation || 
-                          messageData?.extendedTextMessage?.text || 
-                          messageData?.imageMessage?.caption || 
-                          messageData?.videoMessage?.caption || 
-                          messageData?.documentMessage?.caption || 
-                          null
+        let textContent = messageData?.conversation ||
+          messageData?.extendedTextMessage?.text ||
+          messageData?.imageMessage?.caption ||
+          messageData?.videoMessage?.caption ||
+          messageData?.documentMessage?.caption ||
+          null
 
         if (!textContent) {
           console.log("[OK] Mensaje manual sin texto. Omitiendo.");
@@ -256,14 +256,14 @@ serve(async (req) => {
         const customerPhone = customerJid.split('@')[0]
         const customerName = data.pushName || 'Cliente de WhatsApp'
         const messageId = key.id
-        
+
         // Extraer texto del mensaje
-        let textContent = messageData.conversation || 
-                          messageData.extendedTextMessage?.text || 
-                          messageData.imageMessage?.caption || 
-                          messageData.videoMessage?.caption || 
-                          messageData.documentMessage?.caption || 
-                          null
+        let textContent = messageData.conversation ||
+          messageData.extendedTextMessage?.text ||
+          messageData.imageMessage?.caption ||
+          messageData.videoMessage?.caption ||
+          messageData.documentMessage?.caption ||
+          null
 
         if (!textContent) {
           console.log("[OK] Mensaje recibido sin contenido de texto válido (posible sticker, audio o archivo sin leyenda). Omitiendo.");
@@ -412,7 +412,7 @@ serve(async (req) => {
               }),
               timeout: 8000
             })
-            
+
             if (findContactsRes.ok) {
               const contacts = await findContactsRes.json()
               console.log(`[VERIFICADOR] Respuesta findContacts:`, JSON.stringify(contacts))
@@ -432,7 +432,7 @@ serve(async (req) => {
         } else {
           console.warn("[WARNING] EVOLUTION_API_URL o EVOLUTION_API_TOKEN no están configurados en los Secretos de Supabase.");
         }
-        
+
         console.log(`[VERIFICADOR] Remitente ${customerPhone} está guardado en contactos?:`, isContactSaved)
 
         const respondSaved = botConfig.respond_saved_contacts !== undefined ? botConfig.respond_saved_contacts : true
@@ -456,10 +456,10 @@ serve(async (req) => {
           } else if (unsavedAction === 'fallback') {
             console.log(`[OK] Filtro: "Enviar mensaje de fallback a números no guardados" está activado.`)
             const fallbackMsg = botConfig.fallback_message || 'Hola. En este momento solo atendemos a contactos registrados.'
-            
+
             await sendWhatsappMessage(EVOLUTION_API_URL, EVOLUTION_API_TOKEN, instance, customerPhone, fallbackMsg)
             await insertMessageToDb(supabase, convData.id, null, 'bot', fallbackMsg)
-            
+
             await insertAuditLog(supabase, numData.user_id, numData.id, 'AI_FALLBACK', `Mensaje de número no guardado ${customerPhone} respondió con mensaje de Fallback.`)
             return new Response(JSON.stringify({ success: true, filtered: 'unsaved_contact_fallback' }), {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -478,12 +478,12 @@ serve(async (req) => {
         if (isHandoffTriggered) {
           console.log(`[OK] Handoff activado por trigger de parada o palabra clave. Transfiriendo conversación a humano.`)
           await supabase.from('conversations').update({ status: 'HUMAN' }).eq('id', convData.id)
-          
+
           const handoffReply = "Tu conversación ha sido transferida a un asesor. El asistente de IA se ha pausado."
           await sendWhatsappMessage(EVOLUTION_API_URL, EVOLUTION_API_TOKEN, instance, customerPhone, handoffReply)
           await insertMessageToDb(supabase, convData.id, null, 'bot', handoffReply)
-          
-          const triggerDetail = isStopTriggered 
+
+          const triggerDetail = isStopTriggered
             ? `Intervención humana activada por trigger de parada "${botConfig.stop_trigger}".`
             : `Intervención humana activada automáticamente por palabra clave de handoff.`
           await insertAuditLog(supabase, numData.user_id, numData.id, 'HANDOFF_TRIGGERED', `${triggerDetail} Cliente: ${customerPhone}`)
@@ -557,14 +557,6 @@ serve(async (req) => {
           })
         }
 
-        if (!connData.is_active) {
-          console.warn(`[WARNING] La conexión de IA "${connData.nickname}" está desactivada (is_active = false). Omitiendo respuesta.`)
-          await insertAuditLog(supabase, numData.user_id, numData.id, 'AI_CONNECTION_INACTIVE', `Mensaje recibido de ${customerPhone} pero omitido porque la conexión de IA "${connData.nickname}" está inactiva.`)
-          return new Response(JSON.stringify({ success: true, status: 'inactive_connection' }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          })
-        }
-
         console.log(`[VERIFICADOR] Conexión de IA encontrada: Provider = ${connData.provider}, Nickname = "${connData.nickname}"`)
 
         // J. Ensamblar Prompt y Llamar a Proveedor
@@ -608,7 +600,7 @@ serve(async (req) => {
 
         console.log(`[VERIFICADOR] Llamando al LLM: ${connData.provider} con System Prompt: "${systemPrompt.slice(0, 150)}..." y temperatura ${temperature}`)
         console.log(`[VERIFICADOR] Historial de mensajes ensamblado para LLM:`, JSON.stringify(messagesPayload, null, 2))
-        
+
         let responseText = ""
         let tokensPrompt = 0
         let tokensCompletion = 0
@@ -616,7 +608,7 @@ serve(async (req) => {
         // Obtener el modelo asignado al agente, con fallback al default del proveedor
         let modelName = botConfig.agents?.model
         const provider = connData.provider
-        
+
         if (provider === 'openai') {
           if (!modelName || !modelName.startsWith('gpt-')) {
             modelName = 'gpt-4o-mini'
@@ -633,30 +625,18 @@ serve(async (req) => {
           if (!modelName || !modelName.startsWith('llama')) {
             modelName = 'llama3-8b-8192'
           }
-        } else if (provider === 'deepseek') {
-          if (!modelName || !modelName.startsWith('deepseek-')) {
-            modelName = 'deepseek-chat'
-          }
-        } else if (provider === 'openrouter') {
-          if (!modelName) {
-            modelName = 'meta-llama/llama-3.1-8b-instruct:free'
-          }
         }
 
         console.log(`[VERIFICADOR] API Key del proveedor (${connData.provider}): "${connData.api_key ? connData.api_key.slice(0, 10) + '...' : 'VACÍA'}"`)
 
         try {
-          if (connData.provider === 'openai' || connData.provider === 'groq' || connData.provider === 'gemini' || connData.provider === 'deepseek' || connData.provider === 'openrouter') {
+          if (connData.provider === 'openai' || connData.provider === 'groq' || connData.provider === 'gemini') {
             let apiUrl = 'https://api.openai.com/v1/chat/completions'
-            
+
             if (connData.provider === 'groq') {
               apiUrl = 'https://api.groq.com/openai/v1/chat/completions'
             } else if (connData.provider === 'gemini') {
               apiUrl = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
-            } else if (connData.provider === 'deepseek') {
-              apiUrl = 'https://api.deepseek.com/v1/chat/completions'
-            } else if (connData.provider === 'openrouter') {
-              apiUrl = 'https://openrouter.ai/api/v1/chat/completions'
             }
 
             console.log(`[VERIFICADOR] Realizando Fetch a endpoint compatible con OpenAI: ${apiUrl} (Modelo: ${modelName})`)
@@ -745,10 +725,10 @@ serve(async (req) => {
         if (responseText && EVOLUTION_API_URL && EVOLUTION_API_TOKEN) {
           console.log(`[VERIFICADOR] Enviando mensaje de respuesta a WhatsApp: ${customerPhone}`)
           await sendWhatsappMessage(EVOLUTION_API_URL, EVOLUTION_API_TOKEN, instance, customerPhone, responseText)
-          
+
           // Guardar el mensaje del bot en Supabase
           await insertMessageToDb(supabase, convData.id, null, 'bot', responseText)
-          
+
           // Log success of AI processing
           await insertAuditLog(supabase, numData.user_id, numData.id, 'AI_RESPONSE', `IA respondió a ${customerPhone} exitosamente usando ${connData.provider}.`)
 
@@ -834,17 +814,6 @@ function getModelRates(provider: string, model: string) {
       costPerPrompt = 0.05 / 1000000;
       costPerCompletion = 0.08 / 1000000;
     }
-  } else if (provider === 'deepseek') {
-    costPerPrompt = 0.14 / 1000000;
-    costPerCompletion = 0.28 / 1000000;
-  } else if (provider === 'openrouter') {
-    if (normalizedModel.includes('free')) {
-      costPerPrompt = 0;
-      costPerCompletion = 0;
-    } else {
-      costPerPrompt = 0.05 / 1000000;
-      costPerCompletion = 0.08 / 1000000;
-    }
   }
 
   return { costPerPrompt, costPerCompletion };
@@ -859,7 +828,7 @@ async function insertMessageToDb(supabase: any, conversationId: string, messageI
   if (messageId) {
     insertPayload.whatsapp_message_id = messageId
   }
-  
+
   const { data, error } = await supabase
     .from('messages')
     .insert(insertPayload)
@@ -883,7 +852,7 @@ async function sendWhatsappMessage(serverUrl: string, apikey: string, instanceNa
   }
   const cleanUrl = serverUrl.endsWith('/') ? serverUrl.slice(0, -1) : serverUrl
   const url = `${cleanUrl}/message/sendText/${instanceName}`
-  
+
   console.log(`[VERIFICADOR] Llamando sendText de Evolution API: ${url}`)
   try {
     const res = await fetchWithTimeout(url, {
@@ -931,10 +900,10 @@ async function insertAuditLog(supabase: any, userId: string, numberId: string, e
 
 async function fetchWithTimeout(resource: string | URL | Request, options: RequestInit & { timeout?: number } = {}): Promise<Response> {
   const { timeout = 15000, ...rest } = options;
-  
+
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
-  
+
   try {
     const response = await fetch(resource, {
       ...rest,

@@ -3,8 +3,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import MetricCard from '../../components/MetricCard'
 import { useToast } from '../../components/Toast'
-import { 
-  DollarSign, Coins, MessageSquare, Info, TrendingDown, 
+import {
+  DollarSign, Coins, MessageSquare, Info, TrendingDown,
   Sparkles, CheckCircle2, RefreshCw, BarChart2, ShieldAlert
 } from 'lucide-react'
 
@@ -24,13 +24,6 @@ const MODEL_RATES_INFO = {
   groq: [
     { name: 'llama3-8b', desc: 'Llama 3 open-source optimizada para respuestas instantáneas', in: '$0.05', out: '$0.08' },
     { name: 'llama3-70b', desc: 'Alta capacidad e inteligencia con baja latencia', in: '$0.59', out: '$0.79' }
-  ],
-  deepseek: [
-    { name: 'deepseek-chat', desc: 'Modelo insignia de DeepSeek, altamente económico y potente', in: '$0.14', out: '$0.28' }
-  ],
-  openrouter: [
-    { name: 'llama-3.1-8b-instruct:free', desc: 'Llama 3.1 libre a través de la API de OpenRouter', in: '$0.00', out: '$0.00' },
-    { name: 'gemma-2-9b-it:free', desc: 'Gemma 2 libre a través de la API de OpenRouter', in: '$0.00', out: '$0.00' }
   ]
 }
 
@@ -38,11 +31,11 @@ export default function Consumption() {
   const { user } = useAuth()
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
-  
+
   // Data State
   const [rawLogs, setRawLogs] = useState([])
   const [numbers, setNumbers] = useState([])
-  
+
   // UI State
   const [selectedProvider, setSelectedProvider] = useState('all')
 
@@ -126,8 +119,8 @@ export default function Consumption() {
   }, [user])
 
   // Filter logs by selected provider if not 'all'
-  const filteredLogs = selectedProvider === 'all' 
-    ? rawLogs 
+  const filteredLogs = selectedProvider === 'all'
+    ? rawLogs
     : rawLogs.filter(log => log.provider === selectedProvider)
 
   // Calculate Aggregated Metrics
@@ -135,7 +128,7 @@ export default function Consumption() {
   const totalPromptTokens = filteredLogs.reduce((sum, log) => sum + (log.tokens_prompt || 0), 0)
   const totalCompletionTokens = filteredLogs.reduce((sum, log) => sum + (log.tokens_completion || 0), 0)
   const totalTokens = totalPromptTokens + totalCompletionTokens
-  
+
   // Calculate average cost per message response (each log is one AI output)
   const totalMessagesCount = filteredLogs.length
   const avgCostPerMsg = totalMessagesCount > 0 ? (totalCost / totalMessagesCount) : 0
@@ -146,7 +139,7 @@ export default function Consumption() {
     const prompt = numLogs.reduce((sum, log) => sum + (log.tokens_prompt || 0), 0)
     const completion = numLogs.reduce((sum, log) => sum + (log.tokens_completion || 0), 0)
     const cost = numLogs.reduce((sum, log) => sum + (log.estimated_cost || 0), 0)
-    
+
     // Extract configured model safely
     let config = num.bot_configurations
     if (Array.isArray(config)) {
@@ -182,79 +175,67 @@ export default function Consumption() {
 
       {/* Selector de Proveedor */}
       <div className="provider-selector" style={{ marginBottom: '24px' }}>
-        <button 
+        <button
           className={`provider-btn ${selectedProvider === 'all' ? 'selected active' : ''}`}
           onClick={() => setSelectedProvider('all')}
         >
           Todos los Proveedores
         </button>
-        <button 
+        <button
           className={`provider-btn ${selectedProvider === 'openai' ? 'selected active' : ''}`}
           onClick={() => setSelectedProvider('openai')}
         >
           OpenAI
         </button>
-        <button 
+        <button
           className={`provider-btn ${selectedProvider === 'claude' ? 'selected active' : ''}`}
           onClick={() => setSelectedProvider('claude')}
         >
           Anthropic (Claude)
         </button>
-        <button 
+        <button
           className={`provider-btn ${selectedProvider === 'gemini' ? 'selected active' : ''}`}
           onClick={() => setSelectedProvider('gemini')}
         >
           Google Gemini
         </button>
-        <button 
+        <button
           className={`provider-btn ${selectedProvider === 'groq' ? 'selected active' : ''}`}
           onClick={() => setSelectedProvider('groq')}
         >
           Groq (Llama)
         </button>
-        <button 
-          className={`provider-btn ${selectedProvider === 'deepseek' ? 'selected active' : ''}`}
-          onClick={() => setSelectedProvider('deepseek')}
-        >
-          DeepSeek
-        </button>
-        <button 
-          className={`provider-btn ${selectedProvider === 'openrouter' ? 'selected active' : ''}`}
-          onClick={() => setSelectedProvider('openrouter')}
-        >
-          OpenRouter
-        </button>
       </div>
 
       {/* Tarjetas de Resumen General */}
       <div className="consumption-cards">
-        <MetricCard 
-          icon={DollarSign} 
-          label="Costo Estimado" 
-          value={`$${totalCost.toFixed(4)}`} 
-          sub={`USD (${selectedProvider === 'all' ? 'Total' : selectedProvider.toUpperCase()})`} 
-          color="primary" 
+        <MetricCard
+          icon={DollarSign}
+          label="Costo Estimado"
+          value={`$${totalCost.toFixed(4)}`}
+          sub={`USD (${selectedProvider === 'all' ? 'Total' : selectedProvider.toUpperCase()})`}
+          color="primary"
         />
-        <MetricCard 
-          icon={Coins} 
-          label="Tokens Totales" 
-          value={totalTokens.toLocaleString()} 
-          sub={`${totalPromptTokens.toLocaleString()} in / ${totalCompletionTokens.toLocaleString()} out`} 
-          color="warning" 
+        <MetricCard
+          icon={Coins}
+          label="Tokens Totales"
+          value={totalTokens.toLocaleString()}
+          sub={`${totalPromptTokens.toLocaleString()} in / ${totalCompletionTokens.toLocaleString()} out`}
+          color="warning"
         />
-        <MetricCard 
-          icon={MessageSquare} 
-          label="Mensajes Procesados" 
-          value={totalMessagesCount.toLocaleString()} 
-          sub="Respuestas de IA acumuladas" 
-          color="success" 
+        <MetricCard
+          icon={MessageSquare}
+          label="Mensajes Procesados"
+          value={totalMessagesCount.toLocaleString()}
+          sub="Respuestas de IA acumuladas"
+          color="success"
         />
-        <MetricCard 
-          icon={BarChart2} 
-          label="Costo por Respuesta" 
-          value={`$${avgCostPerMsg.toFixed(5)}`} 
-          sub="Promedio de consumo USD" 
-          color="info" 
+        <MetricCard
+          icon={BarChart2}
+          label="Costo por Respuesta"
+          value={`$${avgCostPerMsg.toFixed(5)}`}
+          sub="Promedio de consumo USD"
+          color="info"
         />
       </div>
 
@@ -264,7 +245,7 @@ export default function Consumption() {
           <Coins size={18} />
           <h2>Consumo Detallado por Número</h2>
         </div>
-        
+
         {loading ? (
           <div className="loading-state">Cargando desglose...</div>
         ) : (
@@ -353,7 +334,7 @@ export default function Consumption() {
           <TrendingDown size={18} />
           <h2>Recomendaciones para Reducción de Costos y Optimización de Tokens</h2>
         </div>
-        
+
         <div className="recommendations-list">
           <div className="recommendation-item">
             <div className="recommendation-icon">
