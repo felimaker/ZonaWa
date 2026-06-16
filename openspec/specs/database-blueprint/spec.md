@@ -84,6 +84,7 @@ create table public.bot_configurations (
   inactivity_wait_minutes integer default 0 check (inactivity_wait_minutes >= 0) not null,
   stop_trigger text default 'stop' not null,
   bot_trigger text default 'bot' not null,
+  continue_ai_after_manual boolean default false not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -134,6 +135,7 @@ create table public.usage_logs (
 create table public.audit_logs (
   id uuid default uuid_generate_v4() primary key,
   user_id uuid references public.profiles(id) on delete cascade not null,
+  number_id uuid references public.whatsapp_numbers(id) on delete cascade,
   event_type text not null,
   details text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null

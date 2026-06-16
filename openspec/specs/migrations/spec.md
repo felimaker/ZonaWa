@@ -166,6 +166,27 @@ Si se crea una nueva tabla, es obligatorio:
   DROP COLUMN bot_trigger;
   ```
 
+### Migración v1.5.0 - Continuar IA tras Mensaje Manual y Habilitación de Realtime
+- **Fecha:** 2026-06-15
+- **Propósito:** Agregar columna `continue_ai_after_manual` a la tabla `bot_configurations` para controlar si el bot continúa respondiendo tras un mensaje manual, y habilitar la publicación en tiempo real de Supabase (`supabase_realtime`) para las tablas clave.
+- **Script SQL (Ejecutar en Supabase SQL Editor):**
+  ```sql
+  ALTER TABLE public.bot_configurations
+  ADD COLUMN continue_ai_after_manual BOOLEAN DEFAULT false NOT NULL;
+
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.conversations;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.usage_logs;
+  ```
+- **Rollback SQL:**
+  ```sql
+  ALTER TABLE public.bot_configurations DROP COLUMN continue_ai_after_manual;
+
+  ALTER PUBLICATION supabase_realtime DROP TABLE public.conversations;
+  ALTER PUBLICATION supabase_realtime DROP TABLE public.messages;
+  ALTER PUBLICATION supabase_realtime DROP TABLE public.usage_logs;
+  ```
+
 ## Requirements
 ### Requirement: Inmutabilidad de las Migraciones Ejecutadas
 Cualquier cambio estructural en la base de datos SHALL ejecutarse mediante un script de migración inmutable y secuencial acompañado de su correspondiente script de rollback.

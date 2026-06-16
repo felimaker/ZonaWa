@@ -66,7 +66,7 @@ Para evitar reintentos duplicados por parte de Evolution API debido a retrasos e
 2. **Identificación y Validación Inmediata:** La Edge Function extrae el identificador de la instancia (`session_name`), verifica el estado del bot (`bot_enabled = true`) y valida la firma de seguridad.
 3. **Persistencia e Interrupción Temprana:** 
    * Se inserta el mensaje entrante en la tabla `messages` usando el ID único de mensaje (`whatsapp_message_id`). Si el mensaje ya existe (reintento), la base de datos lo ignora y la función finaliza inmediatamente.
-   * Se verifica el estado de la conversación (`conversations.status`). Si está en modo `'HUMAN'`, la ejecución se detiene aquí.
+   * Se verifica el estado de la conversación (`conversations.status`). Si está en modo `'HUMAN'`, se evalúan las reglas avanzadas de control (trigger de reactivación e inactividad) cargando la configuración del bot para decidir si se reactiva a `'BOT'` o si se detiene la ejecución.
 4. **Respuesta Rápida (200 OK):** Si la solicitud es válida y el bot está activo para este chat, la Edge Function responde inmediatamente `200 OK` (liberando el hilo de Evolution API para evitar reintentos).
 5. **Ejecución en Segundo Plano (Background Task):** 
    Utilizando `EdgeRuntime.waitUntil()` en Deno Deploy, la ejecución continúa en segundo plano:
