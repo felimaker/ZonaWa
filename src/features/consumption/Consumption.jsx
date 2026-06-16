@@ -202,10 +202,10 @@ export default function Consumption() {
     
     if (searchText) {
       const q = searchText.toLowerCase()
-      const inPrompt = log.prompt_text?.toLowerCase().includes(q)
-      const inResponse = log.response_text?.toLowerCase().includes(q)
-      const inModel = log.model_name?.toLowerCase().includes(q)
-      const inProvider = log.provider?.toLowerCase().includes(q)
+      const inPrompt = log.prompt_text ? log.prompt_text.toLowerCase().includes(q) : false
+      const inResponse = log.response_text ? log.response_text.toLowerCase().includes(q) : false
+      const inModel = log.model_name ? log.model_name.toLowerCase().includes(q) : false
+      const inProvider = log.provider ? log.provider.toLowerCase().includes(q) : false
       return inPrompt || inResponse || inModel || inProvider
     }
     return true
@@ -224,15 +224,19 @@ export default function Consumption() {
 
   const getPromptSnippet = (text) => {
     if (!text) return 'Sin prompt';
+    let rawText = text;
     try {
       const parsed = JSON.parse(text);
       if (Array.isArray(parsed)) {
         const lastUser = parsed.filter(m => m.role === 'user').pop();
-        if (lastUser) return lastUser.content;
-        return parsed[0]?.content || '';
+        if (lastUser) {
+          rawText = lastUser.content;
+        } else {
+          rawText = parsed[0]?.content || '';
+        }
       }
     } catch (e) {}
-    return text;
+    return rawText.length > 50 ? rawText.slice(0, 50) + '...' : rawText;
   }
 
   const formatDateTime = (dateStr) => {
@@ -591,7 +595,7 @@ export default function Consumption() {
             </div>
 
             <div style={{ marginBottom: '20px' }}>
-              <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <h4 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-2)' }}>Tránsito de Entrada (System Prompt & Historial)</h4>
                 <button className="btn-outline btn-sm" onClick={() => handleCopy(selectedLog.prompt_text, 'prompt')}>
                   {copiedPrompt ? <Check size={12} style={{ color: 'var(--success)' }} /> : <Copy size={12} />}
@@ -613,7 +617,7 @@ export default function Consumption() {
             </div>
 
             <div style={{ marginBottom: '12px' }}>
-              <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <h4 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-2)' }}>Respuesta de la IA (Completado)</h4>
                 <button className="btn-outline btn-sm" onClick={() => handleCopy(selectedLog.response_text || '', 'response')}>
                   {copiedResponse ? <Check size={12} style={{ color: 'var(--success)' }} /> : <Copy size={12} />}
