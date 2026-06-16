@@ -102,6 +102,9 @@ serve(async (req) => {
         throw error
       }
       console.log('[OK] Estado de conexión actualizado correctamente en Supabase.')
+      return new Response(JSON.stringify({ success: true, connection_updated: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     // 2. EVENTO: RECEPCIÓN DE MENSAJES
@@ -145,7 +148,13 @@ serve(async (req) => {
 
         console.log(`[VERIFICADOR] Mensaje manual del operador desde celular detectado: "${textContent}"`);
 
-        const customerJid = key.remoteJid
+        const customerJid = key?.remoteJid || ""
+        if (!customerJid) {
+          console.warn("[WARNING] Mensaje saliente sin remoteJid. Omitiendo.");
+          return new Response(JSON.stringify({ success: true, reason: 'missing_remoteJid' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
         const customerPhone = customerJid.split('@')[0]
         const customerName = 'Cliente de WhatsApp' // pushName no disponible en fromMe
 
@@ -237,7 +246,13 @@ serve(async (req) => {
       }
 
       if (key && messageData) {
-        const customerJid = key.remoteJid
+        const customerJid = key?.remoteJid || ""
+        if (!customerJid) {
+          console.warn("[WARNING] Mensaje entrante sin remoteJid. Omitiendo.");
+          return new Response(JSON.stringify({ success: true, reason: 'missing_remoteJid' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
         const customerPhone = customerJid.split('@')[0]
         const customerName = data.pushName || 'Cliente de WhatsApp'
         const messageId = key.id
