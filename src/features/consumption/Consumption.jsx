@@ -24,6 +24,13 @@ const MODEL_RATES_INFO = {
   groq: [
     { name: 'llama3-8b', desc: 'Llama 3 open-source optimizada para respuestas instantáneas', in: '$0.05', out: '$0.08' },
     { name: 'llama3-70b', desc: 'Alta capacidad e inteligencia con baja latencia', in: '$0.59', out: '$0.79' }
+  ],
+  deepseek: [
+    { name: 'deepseek-chat', desc: 'Modelo insignia de DeepSeek, altamente económico y potente', in: '$0.14', out: '$0.28' }
+  ],
+  openrouter: [
+    { name: 'llama-3.1-8b-instruct:free', desc: 'Llama 3.1 libre a través de la API de OpenRouter', in: '$0.00', out: '$0.00' },
+    { name: 'gemma-2-9b-it:free', desc: 'Gemma 2 libre a través de la API de OpenRouter', in: '$0.00', out: '$0.00' }
   ]
 }
 
@@ -204,6 +211,18 @@ export default function Consumption() {
           onClick={() => setSelectedProvider('groq')}
         >
           Groq (Llama)
+        </button>
+        <button 
+          className={`provider-btn ${selectedProvider === 'deepseek' ? 'selected active' : ''}`}
+          onClick={() => setSelectedProvider('deepseek')}
+        >
+          DeepSeek
+        </button>
+        <button 
+          className={`provider-btn ${selectedProvider === 'openrouter' ? 'selected active' : ''}`}
+          onClick={() => setSelectedProvider('openrouter')}
+        >
+          OpenRouter
         </button>
       </div>
 

@@ -91,22 +91,46 @@ export default function Dashboard() {
   }
 
   async function fetchChart() {
+    const now = new Date()
+    const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6)
+    const startDateISO = startDate.toISOString()
+
+    const { data, error } = await supabase
+      .from('usage_logs')
+      .select('estimated_cost, tokens_prompt, tokens_completion, created_at')
+      .eq('user_id', user.id)
+      .gte('created_at', startDateISO)
+
+    if (error) {
+      console.error('Error fetching chart data:', error)
+      return
+    }
+
+    const logs = data || []
     const days = []
+
     for (let i = 6; i >= 0; i--) {
       const d = new Date()
       d.setDate(d.getDate() - i)
-      const start = new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString()
-      const end = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).toISOString()
       
-      const { data } = await supabase.from('usage_logs')
-        .select('estimated_cost, tokens_prompt, tokens_completion')
-        .eq('user_id', user.id)
-        .gte('created_at', start).lt('created_at', end)
-        
-      const cost = (data || []).reduce((s, r) => s + (r.estimated_cost || 0), 0)
-      const tokens = (data || []).reduce((s, r) => s + (r.tokens_prompt || 0) + (r.tokens_completion || 0), 0)
-      days.push({ day: d.toLocaleDateString('es', { weekday: 'short' }), cost: parseFloat(cost.toFixed(4)), tokens })
+      const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+      const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)
+
+      const dayLogs = logs.filter(log => {
+        const logDate = new Date(log.created_at)
+        return logDate >= dayStart && logDate < dayEnd
+      })
+
+      const cost = dayLogs.reduce((s, r) => s + (r.estimated_cost || 0), 0)
+      const tokens = dayLogs.reduce((s, r) => s + (r.tokens_prompt || 0) + (r.tokens_completion || 0), 0)
+
+      days.push({
+        day: d.toLocaleDateString('es', { weekday: 'short' }),
+        cost: parseFloat(cost.toFixed(4)),
+        tokens
+      })
     }
+
     setChartData(days)
   }
 

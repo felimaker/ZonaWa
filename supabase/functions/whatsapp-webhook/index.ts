@@ -557,6 +557,14 @@ serve(async (req) => {
           })
         }
 
+        if (!connData.is_active) {
+          console.warn(`[WARNING] La conexión de IA "${connData.nickname}" está desactivada (is_active = false). Omitiendo respuesta.`)
+          await insertAuditLog(supabase, numData.user_id, numData.id, 'AI_CONNECTION_INACTIVE', `Mensaje recibido de ${customerPhone} pero omitido porque la conexión de IA "${connData.nickname}" está inactiva.`)
+          return new Response(JSON.stringify({ success: true, status: 'inactive_connection' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+
         console.log(`[VERIFICADOR] Conexión de IA encontrada: Provider = ${connData.provider}, Nickname = "${connData.nickname}"`)
 
         // J. Ensamblar Prompt y Llamar a Proveedor
@@ -625,18 +633,30 @@ serve(async (req) => {
           if (!modelName || !modelName.startsWith('llama')) {
             modelName = 'llama3-8b-8192'
           }
+        } else if (provider === 'deepseek') {
+          if (!modelName || !modelName.startsWith('deepseek-')) {
+            modelName = 'deepseek-chat'
+          }
+        } else if (provider === 'openrouter') {
+          if (!modelName) {
+            modelName = 'meta-llama/llama-3.1-8b-instruct:free'
+          }
         }
 
         console.log(`[VERIFICADOR] API Key del proveedor (${connData.provider}): "${connData.api_key ? connData.api_key.slice(0, 10) + '...' : 'VACÍA'}"`)
 
         try {
-          if (connData.provider === 'openai' || connData.provider === 'groq' || connData.provider === 'gemini') {
+          if (connData.provider === 'openai' || connData.provider === 'groq' || connData.provider === 'gemini' || connData.provider === 'deepseek' || connData.provider === 'openrouter') {
             let apiUrl = 'https://api.openai.com/v1/chat/completions'
             
             if (connData.provider === 'groq') {
               apiUrl = 'https://api.groq.com/openai/v1/chat/completions'
             } else if (connData.provider === 'gemini') {
               apiUrl = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
+            } else if (connData.provider === 'deepseek') {
+              apiUrl = 'https://api.deepseek.com/v1/chat/completions'
+            } else if (connData.provider === 'openrouter') {
+              apiUrl = 'https://openrouter.ai/api/v1/chat/completions'
             }
 
             console.log(`[VERIFICADOR] Realizando Fetch a endpoint compatible con OpenAI: ${apiUrl} (Modelo: ${modelName})`)
@@ -811,6 +831,17 @@ function getModelRates(provider: string, model: string) {
       costPerCompletion = 0.79 / 1000000;
     } else {
       // Fallback a 8B
+      costPerPrompt = 0.05 / 1000000;
+      costPerCompletion = 0.08 / 1000000;
+    }
+  } else if (provider === 'deepseek') {
+    costPerPrompt = 0.14 / 1000000;
+    costPerCompletion = 0.28 / 1000000;
+  } else if (provider === 'openrouter') {
+    if (normalizedModel.includes('free')) {
+      costPerPrompt = 0;
+      costPerCompletion = 0;
+    } else {
       costPerPrompt = 0.05 / 1000000;
       costPerCompletion = 0.08 / 1000000;
     }

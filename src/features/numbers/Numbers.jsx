@@ -37,6 +37,13 @@ const PROVIDER_MODELS = {
   groq: [
     { id: 'llama3-8b-8192', label: 'Llama 3 8B' },
     { id: 'llama3-70b-8192', label: 'Llama 3 70B' }
+  ],
+  deepseek: [
+    { id: 'deepseek-chat', label: 'DeepSeek Chat' }
+  ],
+  openrouter: [
+    { id: 'meta-llama/llama-3.1-8b-instruct:free', label: 'Llama 3.1 8B Free' },
+    { id: 'google/gemma-2-9b-it:free', label: 'Gemma 2 9B Free' }
   ]
 }
 

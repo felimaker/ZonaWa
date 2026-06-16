@@ -20,6 +20,38 @@ export default function Profile() {
     timezone: profile?.timezone || 'America/Bogota',
   })
   const [saving, setSaving] = useState(false)
+  const [stats, setStats] = useState({ numbers: 0, activeBots: 0 })
+  const [loadingStats, setLoadingStats] = useState(true)
+
+  useEffect(() => {
+    if (!user) return
+    async function fetchLimits() {
+      try {
+        const { count: numbersCount, error: numErr } = await supabase
+          .from('whatsapp_numbers')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+
+        const { count: botsCount, error: botErr } = await supabase
+          .from('whatsapp_numbers')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('bot_enabled', true)
+
+        if (!numErr && !botErr) {
+          setStats({
+            numbers: numbersCount || 0,
+            activeBots: botsCount || 0
+          })
+        }
+      } catch (err) {
+        console.error('Error fetching profile limits:', err)
+      } finally {
+        setLoadingStats(false)
+      }
+    }
+    fetchLimits()
+  }, [user])
 
   const up = (k) => (e) => setForm({ ...form, [k]: e.target.value })
 
@@ -59,11 +91,11 @@ export default function Profile() {
           <div className="profile-limits">
             <div className="limit-item">
               <span className="limit-label">Números</span>
-              <span className="limit-value">0 / 6</span>
+              <span className="limit-value">{loadingStats ? '...' : stats.numbers} / 6</span>
             </div>
             <div className="limit-item">
               <span className="limit-label">Bots Activos</span>
-              <span className="limit-value">0 / 5</span>
+              <span className="limit-value">{loadingStats ? '...' : stats.activeBots} / 5</span>
             </div>
           </div>
         </div>

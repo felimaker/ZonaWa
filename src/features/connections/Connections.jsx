@@ -10,6 +10,8 @@ const PROVIDERS = [
   { id: 'gemini', label: 'Google Gemini', color: '#4285f4', hint: 'AIza...' },
   { id: 'claude', label: 'Anthropic Claude', color: '#d97706', hint: 'sk-ant-...' },
   { id: 'groq',   label: 'Groq',   color: '#f43f5e', hint: 'gsk_...' },
+  { id: 'deepseek', label: 'DeepSeek', color: '#4d80f5', hint: 'sk-...' },
+  { id: 'openrouter', label: 'OpenRouter', color: '#7e22ce', hint: 'sk-or-v1-...' },
 ]
 
 export default function Connections() {
