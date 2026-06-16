@@ -682,7 +682,8 @@ export default function Numbers() {
     // Self-healing webhook: always ensure the webhook is set correctly when enabling the bot
     if (!number.bot_enabled) {
       try {
-        await setWebhook(number.session_name, `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook`)
+        const secretParam = number.webhook_secret ? `?secret=${number.webhook_secret}` : ''
+        await setWebhook(number.session_name, `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook${secretParam}`)
       } catch (wErr) {
         console.error("Error setting webhook while enabling bot:", wErr)
       }
@@ -800,12 +801,19 @@ export default function Numbers() {
     const sessionName = `zonawa_${user.id.slice(0, 8)}_${Date.now()}`
     setInstanceSessionName(sessionName)
     
+    // Generar un token secreto de 16 caracteres hexadecimales localmente
+    const webhookSecret = Array.from({length: 16}, () => Math.floor(Math.random()*16).toString(16)).join('');
+    
     try {
       await createInstance(sessionName)
-      await setWebhook(sessionName, `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook`)
+      await setWebhook(sessionName, `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook?secret=${webhookSecret}`)
       
       const { data, error } = await supabase.from('whatsapp_numbers').insert({
-        user_id: user.id, display_name: instanceDisplayName, session_name: sessionName, status: 'WAITING_QR',
+        user_id: user.id, 
+        display_name: instanceDisplayName, 
+        session_name: sessionName, 
+        status: 'WAITING_QR',
+        webhook_secret: webhookSecret
       }).select().single()
       
       if (error) throw error
@@ -997,7 +1005,10 @@ export default function Numbers() {
       
       // Ensure webhook is correctly set in Evolution API
       try {
-        await setWebhook(instanceSessionName, `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook`)
+        const numberObj = numbers.find(n => n.id === onboardingNumberId)
+        const secret = numberObj?.webhook_secret || ''
+        const secretParam = secret ? `?secret=${secret}` : ''
+        await setWebhook(instanceSessionName, `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook${secretParam}`)
       } catch (wErr) {
         console.error("Error setting webhook on onboarding complete:", wErr)
       }
@@ -1502,6 +1513,9 @@ export default function Numbers() {
                     <h3 className="number-name">{number.display_name}</h3>
                     <p className="number-phone">{number.phone_number || 'Sin número asignado'}</p>
                     <p className="number-session">{number.session_name}</p>
+                    <span style={{ fontSize: '0.62rem', color: 'var(--text-3)', background: 'rgba(255,255,255,0.03)', padding: '2px 6px', borderRadius: '4px', display: 'inline-block', marginTop: '2px', fontFamily: 'monospace' }}>
+                      Secret Token: {number.webhook_secret || 'No generado'}
+                    </span>
                   </div>
                 </div>
 

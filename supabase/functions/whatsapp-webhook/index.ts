@@ -41,6 +41,34 @@ serve(async (req) => {
       })
     }
 
+    // Cargar información del número registrado y validar token secreto del webhook
+    const { data: numData, error: numErr } = await supabase
+      .from('whatsapp_numbers')
+      .select('id, user_id, bot_enabled, webhook_secret')
+      .eq('session_name', instance)
+      .maybeSingle()
+
+    if (numErr || !numData) {
+      console.error(`[ERROR] No se encontró el número de WhatsApp registrado para la sesión: ${instance}`, numErr)
+      return new Response(JSON.stringify({ error: 'WhatsApp instance not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    const urlParams = new URL(req.url).searchParams
+    const incomingSecret = urlParams.get('secret')
+    
+    if (numData.webhook_secret && numData.webhook_secret !== incomingSecret) {
+      console.error(`[ERROR] Token secreto inválido en el webhook para la sesión ${instance}. Recibido: ${incomingSecret}`);
+      return new Response(JSON.stringify({ error: 'Unauthorized: Invalid webhook secret' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    console.log(`[VERIFICADOR] Token secreto validado con éxito para ${instance}`);
+
     // 1. EVENTO: ACTUALIZACIÓN DE CONEXIÓN
     if (eventLower === 'connection.update') {
       const state = data?.state
@@ -116,21 +144,6 @@ serve(async (req) => {
         }
 
         console.log(`[VERIFICADOR] Mensaje manual del operador desde celular detectado: "${textContent}"`);
-
-        // Obtener el número de WhatsApp registrado
-        const { data: numData, error: numErr } = await supabase
-          .from('whatsapp_numbers')
-          .select('id, user_id')
-          .eq('session_name', instance)
-          .single()
-
-        if (numErr || !numData) {
-          console.error('[ERROR] No se encontró el número de WhatsApp para la sesión:', instance)
-          return new Response(JSON.stringify({ error: 'WhatsApp instance not found' }), {
-            status: 404,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          })
-        }
 
         const customerJid = key.remoteJid
         const customerPhone = customerJid.split('@')[0]
@@ -246,22 +259,7 @@ serve(async (req) => {
 
         console.log(`[OK] Mensaje de texto extraído: [${customerPhone}] (${customerName}): "${textContent}"`)
 
-        // A. Obtener el número de WhatsApp registrado y activo
-        const { data: numData, error: numErr } = await supabase
-          .from('whatsapp_numbers')
-          .select('id, user_id, bot_enabled')
-          .eq('session_name', instance)
-          .single()
-
-        if (numErr || !numData) {
-          console.error('[ERROR] No se encontró el número de WhatsApp registrado para la sesión:', instance)
-          return new Response(JSON.stringify({ error: 'WhatsApp instance not found' }), {
-            status: 404,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          })
-        }
-
-        console.log(`[VERIFICADOR] Instancia encontrada: ID ${numData.id}. ¿Bot Activo?: ${numData.bot_enabled}`)
+        console.log(`[VERIFICADOR] Instancia encontrada de forma global: ID ${numData.id}. ¿Bot Activo?: ${numData.bot_enabled}`)
 
         // B. Asegurar que la conversación exista en la base de datos sin sobreescribir last_message_at
         let { data: convData, error: convErr } = await supabase
@@ -386,7 +384,7 @@ serve(async (req) => {
         if (EVOLUTION_API_URL && EVOLUTION_API_TOKEN) {
           console.log(`[VERIFICADOR] Buscando contacto ${customerJid} en Evolution API: ${EVOLUTION_API_URL}`)
           try {
-            const findContactsRes = await fetch(`${EVOLUTION_API_URL}/chat/findContacts/${instance}`, {
+            const findContactsRes = await fetchWithTimeout(`${EVOLUTION_API_URL}/chat/findContacts/${instance}`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -396,7 +394,8 @@ serve(async (req) => {
                 where: {
                   id: customerJid
                 }
-              })
+              }),
+              timeout: 8000
             })
             
             if (findContactsRes.ok) {
@@ -530,7 +529,7 @@ serve(async (req) => {
 
         // I. Obtener Conexión de IA Activa y Cifrada
         const { data: connData, error: connErr } = await supabase
-          .from('ai_connections')
+          .from('decrypted_ai_connections')
           .select('*')
           .eq('id', botConfig.connection_id)
           .single()
@@ -627,7 +626,7 @@ serve(async (req) => {
 
             console.log(`[VERIFICADOR] Realizando Fetch a endpoint compatible con OpenAI: ${apiUrl} (Modelo: ${modelName})`)
 
-            const aiRes = await fetch(apiUrl, {
+            const aiRes = await fetchWithTimeout(apiUrl, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -638,7 +637,8 @@ serve(async (req) => {
                 messages: messagesPayload,
                 temperature: temperature,
                 max_tokens: maxTokens
-              })
+              }),
+              timeout: 18000
             })
 
             console.log(`[VERIFICADOR] API del proveedor respondió con Status HTTP: ${aiRes.status}`)
@@ -660,7 +660,7 @@ serve(async (req) => {
 
             console.log(`[VERIFICADOR] Realizando Fetch a Claude (Anthropic API)... (Modelo: ${modelName}) (Prompt Caching activado)`)
 
-            const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+            const aiRes = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -680,7 +680,8 @@ serve(async (req) => {
                 messages: claudeMessages,
                 max_tokens: maxTokens,
                 temperature: temperature
-              })
+              }),
+              timeout: 18000
             })
 
             console.log(`[VERIFICADOR] API de Claude respondió con Status HTTP: ${aiRes.status}`)
@@ -839,7 +840,7 @@ async function sendWhatsappMessage(serverUrl: string, apikey: string, instanceNa
   
   console.log(`[VERIFICADOR] Llamando sendText de Evolution API: ${url}`)
   try {
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -849,7 +850,8 @@ async function sendWhatsappMessage(serverUrl: string, apikey: string, instanceNa
         number,
         text,
         delay: 1200
-      })
+      }),
+      timeout: 10000
     })
 
     if (!res.ok) {
@@ -878,6 +880,23 @@ async function insertAuditLog(supabase: any, userId: string, numberId: string, e
     })
   if (error) {
     console.error(`[ERROR] Insertando audit_log (${eventType}):`, error)
+  }
+}
+
+async function fetchWithTimeout(resource: string | URL | Request, options: RequestInit & { timeout?: number } = {}): Promise<Response> {
+  const { timeout = 15000, ...rest } = options;
+  
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  
+  try {
+    const response = await fetch(resource, {
+      ...rest,
+      signal: controller.signal
+    });
+    return response;
+  } finally {
+    clearTimeout(id);
   }
 }
 

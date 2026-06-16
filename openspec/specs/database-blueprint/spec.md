@@ -49,6 +49,7 @@ create table public.whatsapp_numbers (
   session_name text not null unique, -- Identificador único de instancia en Evolution API
   status text default 'CREATED' check (status in ('CREATED', 'WAITING_QR', 'CONNECTED', 'DISCONNECTED', 'ERROR', 'PAUSED')),
   bot_enabled boolean default false not null,
+  webhook_secret text default substring(md5(random()::text) from 1 for 16) not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -182,6 +183,45 @@ $$ language plpgsql;
 create trigger tr_check_max_active_bots
   before insert or update of bot_enabled on public.whatsapp_numbers
   for each row execute function public.check_max_active_bots();
+
+### C. Cifrado Automático de API Keys
+```sql
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+
+CREATE OR REPLACE FUNCTION public.encrypt_api_key_trigger()
+RETURNS trigger AS $$
+BEGIN
+  IF TG_OP = 'INSERT' OR (NEW.api_key <> OLD.api_key) THEN
+    IF NEW.api_key NOT LIKE 'hQ%' AND NEW.api_key NOT LIKE 'y2h%' THEN
+      NEW.api_key := encode(extensions.pgp_sym_encrypt(NEW.api_key, 'super-secret-vault-key-123'), 'base64');
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER tr_encrypt_api_key
+  BEFORE INSERT OR UPDATE ON public.ai_connections
+  FOR EACH ROW EXECUTE FUNCTION public.encrypt_api_key_trigger();
+```
+
+### D. Vista Segura de Descifrado
+```sql
+CREATE OR REPLACE VIEW public.decrypted_ai_connections 
+WITH (security_invoker = true) AS
+SELECT 
+  id,
+  user_id,
+  provider,
+  CASE 
+    WHEN user_id = auth.uid() OR auth.role() = 'service_role' 
+      THEN extensions.pgp_sym_decrypt(decode(api_key, 'base64'), 'super-secret-vault-key-123')
+    ELSE '***'
+  END AS api_key,
+  nickname,
+  is_active,
+  created_at
+FROM public.ai_connections;
 ```
 
 ---
