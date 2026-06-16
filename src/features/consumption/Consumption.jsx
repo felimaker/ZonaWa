@@ -3,9 +3,11 @@ import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import MetricCard from '../../components/MetricCard'
 import { useToast } from '../../components/Toast'
+import Modal from '../../components/Modal'
 import {
   DollarSign, Coins, MessageSquare, Info, TrendingDown,
-  Sparkles, CheckCircle2, RefreshCw, BarChart2, ShieldAlert
+  Sparkles, CheckCircle2, RefreshCw, BarChart2, ShieldAlert,
+  Copy, Check, Eye, Search, BrainCircuit
 } from 'lucide-react'
 
 const MODEL_RATES_INFO = {
@@ -38,6 +40,11 @@ export default function Consumption() {
 
   // UI State
   const [selectedProvider, setSelectedProvider] = useState('all')
+  const [selectedLog, setSelectedLog] = useState(null)
+  const [copiedPrompt, setCopiedPrompt] = useState(false)
+  const [copiedResponse, setCopiedResponse] = useState(false)
+  const [searchText, setSearchText] = useState('')
+  const [modelFilter, setModelFilter] = useState('all')
 
   const fetchData = async () => {
     if (!user) return
@@ -160,6 +167,123 @@ export default function Consumption() {
     }
   })
 
+  // Aggregate stats per AI Provider + Model
+  const modelUsageStats = filteredLogs.reduce((acc, log) => {
+    const prov = log.provider || 'desconocido'
+    const model = log.model_name || 'desconocido'
+    const key = `${prov}/${model}`
+    if (!acc[key]) {
+      acc[key] = {
+        provider: prov,
+        model: model,
+        prompt: 0,
+        completion: 0,
+        total: 0,
+        cost: 0,
+        count: 0
+      }
+    }
+    acc[key].prompt += (log.tokens_prompt || 0)
+    acc[key].completion += (log.tokens_completion || 0)
+    acc[key].total += ((log.tokens_prompt || 0) + (log.tokens_completion || 0))
+    acc[key].cost += (log.estimated_cost || 0)
+    acc[key].count += 1
+    return acc
+  }, {})
+
+  const modelUsageArray = Object.values(modelUsageStats).sort((a, b) => b.total - a.total)
+
+  // Get unique model names for filtering traffic logs
+  const uniqueModels = [...new Set(filteredLogs.map(l => l.model_name).filter(Boolean))]
+
+  // Apply search and model filters to traffic logs
+  const trafficLogs = filteredLogs.filter(log => {
+    if (modelFilter !== 'all' && log.model_name !== modelFilter) return false
+    
+    if (searchText) {
+      const q = searchText.toLowerCase()
+      const inPrompt = log.prompt_text?.toLowerCase().includes(q)
+      const inResponse = log.response_text?.toLowerCase().includes(q)
+      const inModel = log.model_name?.toLowerCase().includes(q)
+      const inProvider = log.provider?.toLowerCase().includes(q)
+      return inPrompt || inResponse || inModel || inProvider
+    }
+    return true
+  })
+
+  const handleCopy = (text, type) => {
+    navigator.clipboard.writeText(text)
+    if (type === 'prompt') {
+      setCopiedPrompt(true)
+      setTimeout(() => setCopiedPrompt(false), 2000)
+    } else {
+      setCopiedResponse(true)
+      setTimeout(() => setCopiedResponse(false), 2000)
+    }
+  }
+
+  const getPromptSnippet = (text) => {
+    if (!text) return 'Sin prompt';
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) {
+        const lastUser = parsed.filter(m => m.role === 'user').pop();
+        if (lastUser) return lastUser.content;
+        return parsed[0]?.content || '';
+      }
+    } catch (e) {}
+    return text;
+  }
+
+  const formatDateTime = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  }
+
+  const renderPromptPayload = (promptJson) => {
+    if (!promptJson) return <span style={{ color: 'var(--text-3)' }}>Sin payload</span>;
+    try {
+      const parsed = JSON.parse(promptJson);
+      if (Array.isArray(parsed)) {
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {parsed.map((msg, idx) => {
+              let roleName = 'Asistente';
+              let roleColor = 'var(--primary)';
+              let bg = 'rgba(99,102,241,0.05)';
+              if (msg.role === 'system') {
+                roleName = 'Instrucción de Sistema';
+                roleColor = 'var(--warning)';
+                bg = 'rgba(245,158,11,0.05)';
+              } else if (msg.role === 'user') {
+                roleName = 'Usuario / Cliente';
+                roleColor = 'var(--success)';
+                bg = 'rgba(16,185,129,0.05)';
+              }
+              return (
+                <div key={idx} style={{ background: bg, padding: '8px 12px', borderRadius: '6px', borderLeft: `3px solid ${roleColor}` }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 600, color: roleColor, marginBottom: '4px' }}>
+                    {roleName.toUpperCase()}
+                  </div>
+                  <div style={{ whiteSpace: 'pre-wrap', color: 'var(--text-1)' }}>{msg.content}</div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+    } catch (e) {}
+    return <div style={{ whiteSpace: 'pre-wrap' }}>{promptJson}</div>;
+  }
+
   return (
     <div className="page">
       <div className="page-header">
@@ -239,6 +363,53 @@ export default function Consumption() {
         />
       </div>
 
+      {/* Consumo Acumulado por IA Seleccionada */}
+      <div className="glass-card" style={{ marginBottom: '24px' }}>
+        <div className="card-header">
+          <BrainCircuit size={18} />
+          <h2>Consumo Acumulado por IA y Modelo</h2>
+        </div>
+
+        {loading ? (
+          <div className="loading-state">Calculando agregados...</div>
+        ) : (
+          <div className="table-responsive">
+            <table className="usage-table">
+              <thead>
+                <tr>
+                  <th>Proveedor</th>
+                  <th>Modelo de IA</th>
+                  <th style={{ textAlign: 'right' }}>Peticiones</th>
+                  <th style={{ textAlign: 'right' }}>Tokens Entrada</th>
+                  <th style={{ textAlign: 'right' }}>Tokens Salida</th>
+                  <th style={{ textAlign: 'right' }}>Tokens Totales</th>
+                  <th style={{ textAlign: 'right' }}>Costo Estimado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {modelUsageArray.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="empty-state">Sin datos de tráfico para este proveedor</td>
+                  </tr>
+                ) : (
+                  modelUsageArray.map((item, idx) => (
+                    <tr key={idx}>
+                      <td className="font-semibold text-capitalize">{item.provider}</td>
+                      <td className="font-mono text-xs">{item.model}</td>
+                      <td style={{ textAlign: 'right' }} className="font-mono">{item.count.toLocaleString()}</td>
+                      <td style={{ textAlign: 'right' }} className="font-mono">{item.prompt.toLocaleString()}</td>
+                      <td style={{ textAlign: 'right' }} className="font-mono">{item.completion.toLocaleString()}</td>
+                      <td style={{ textAlign: 'right' }} className="font-mono font-semibold">{item.total.toLocaleString()}</td>
+                      <td style={{ textAlign: 'right' }} className="font-mono text-accent font-semibold">${item.cost.toFixed(5)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Tabla de Consumo por Número */}
       <div className="glass-card" style={{ marginBottom: '24px' }}>
         <div className="card-header">
@@ -296,6 +467,182 @@ export default function Consumption() {
         )}
       </div>
 
+      {/* Historial de Tráfico e Inspector de IA */}
+      <div className="glass-card" style={{ marginBottom: '24px' }}>
+        <div className="card-header" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <MessageSquare size={18} />
+            <h2>Historial de Tránsito e Inspector de IA</h2>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: 'auto' }}>
+            <div style={{ position: 'relative', width: '180px' }}>
+              <input
+                type="text"
+                placeholder="Buscar contenido..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                style={{ padding: '6px 12px 6px 30px', fontSize: '0.78rem' }}
+              />
+              <Search size={12} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)' }} />
+            </div>
+
+            <select
+              value={modelFilter}
+              onChange={(e) => setModelFilter(e.target.value)}
+              style={{ padding: '6px 24px 6px 12px', fontSize: '0.78rem', width: 'auto' }}
+            >
+              <option value="all">Todos los Modelos</option>
+              {uniqueModels.map((m, idx) => (
+                <option key={idx} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="loading-state">Cargando tráfico de IA...</div>
+        ) : (
+          <>
+            <div className="table-responsive" style={{ maxHeight: '420px', overflowY: 'auto' }}>
+              <table className="usage-table">
+                <thead>
+                  <tr>
+                    <th>Fecha y Hora</th>
+                    <th>Proveedor</th>
+                    <th>Modelo</th>
+                    <th>Entrada de IA (Prompt)</th>
+                    <th>Respuesta de IA (Completion)</th>
+                    <th style={{ textAlign: 'right' }}>Tokens (In/Out)</th>
+                    <th style={{ textAlign: 'right' }}>Costo</th>
+                    <th style={{ textAlign: 'center' }}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trafficLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="empty-state">No se registraron interacciones de IA que coincidan</td>
+                    </tr>
+                  ) : (
+                    trafficLogs.map((log) => (
+                      <tr key={log.id}>
+                        <td className="font-mono text-xs">{formatDateTime(log.created_at)}</td>
+                        <td className="text-capitalize">{log.provider}</td>
+                        <td className="font-mono text-xs">{log.model_name || 'Default'}</td>
+                        <td className="text-xs" style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-2)' }}>
+                          {getPromptSnippet(log.prompt_text)}
+                        </td>
+                        <td className="text-xs" style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {log.response_text || 'Sin respuesta'}
+                        </td>
+                        <td style={{ textAlign: 'right' }} className="font-mono text-xs">
+                          {log.tokens_prompt} / {log.tokens_completion}
+                        </td>
+                        <td style={{ textAlign: 'right' }} className="font-mono text-xs text-accent">${(log.estimated_cost || 0).toFixed(5)}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button
+                            className="btn-outline btn-sm icon-btn"
+                            onClick={() => setSelectedLog(log)}
+                            title="Ver detalle e inspeccionar"
+                          >
+                            <Eye size={12} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ marginTop: '12px', textAlign: 'right', fontSize: '0.72rem', color: 'var(--text-3)' }}>
+              Mostrando {trafficLogs.length} de {filteredLogs.length} interacciones de IA.
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Modal Inspector Detallado */}
+      <Modal
+        open={!!selectedLog}
+        onClose={() => {
+          setSelectedLog(null)
+          setCopiedPrompt(false)
+          setCopiedResponse(false)
+        }}
+        title="Inspector de Interacción de IA"
+        size="lg"
+      >
+        {selectedLog && (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+              <div className="glass-card" style={{ padding: '12px 16px' }}>
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Proveedor y Modelo</p>
+                <p style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-1)', textTransform: 'capitalize', marginTop: '4px' }}>
+                  {selectedLog.provider} - <span className="font-mono text-xs">{selectedLog.model_name || 'Default'}</span>
+                </p>
+              </div>
+              <div className="glass-card" style={{ padding: '12px 16px' }}>
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Tokens e Impacto</p>
+                <p style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-1)', marginTop: '4px' }}>
+                  {((selectedLog.tokens_prompt || 0) + (selectedLog.tokens_completion || 0)).toLocaleString()} tokens 
+                  <span style={{ color: 'var(--text-2)', fontSize: '0.78rem' }}> (${(selectedLog.estimated_cost || 0).toFixed(5)} USD)</span>
+                </p>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <h4 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-2)' }}>Tránsito de Entrada (System Prompt & Historial)</h4>
+                <button className="btn-outline btn-sm" onClick={() => handleCopy(selectedLog.prompt_text, 'prompt')}>
+                  {copiedPrompt ? <Check size={12} style={{ color: 'var(--success)' }} /> : <Copy size={12} />}
+                  {copiedPrompt ? 'Copiado' : 'Copiar JSON'}
+                </button>
+              </div>
+              <div style={{
+                maxHeight: '240px',
+                overflowY: 'auto',
+                background: 'rgba(0,0,0,0.2)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '12px',
+                fontSize: '0.82rem',
+                fontFamily: 'monospace'
+              }}>
+                {renderPromptPayload(selectedLog.prompt_text)}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <h4 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-2)' }}>Respuesta de la IA (Completado)</h4>
+                <button className="btn-outline btn-sm" onClick={() => handleCopy(selectedLog.response_text || '', 'response')}>
+                  {copiedResponse ? <Check size={12} style={{ color: 'var(--success)' }} /> : <Copy size={12} />}
+                  {copiedResponse ? 'Copiado' : 'Copiar Respuesta'}
+                </button>
+              </div>
+              <div style={{
+                maxHeight: '200px',
+                overflowY: 'auto',
+                background: 'rgba(99,102,241,0.05)',
+                border: '1px solid rgba(99,102,241,0.2)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '14px',
+                fontSize: '0.85rem',
+                lineHeight: '1.5',
+                color: 'var(--text-1)',
+                whiteSpace: 'pre-wrap'
+              }}>
+                {selectedLog.response_text || <span style={{ color: 'var(--text-3)' }}>Sin respuesta registrada</span>}
+              </div>
+            </div>
+            
+            <div style={{ textAlign: 'right', fontSize: '0.7rem', color: 'var(--text-3)', fontMono: true }}>
+              ID Petición: {selectedLog.id} • Creado: {formatDateTime(selectedLog.created_at)}
+            </div>
+          </div>
+        )}
+      </Modal>
+
       {/* Tarifas de Proveedores */}
       {selectedProvider !== 'all' && MODEL_RATES_INFO[selectedProvider] && (
         <div className="glass-card" style={{ marginBottom: '24px' }}>
@@ -319,7 +666,7 @@ export default function Consumption() {
                   <span className="model-rate-val">{rate.in} / 1M tkn</span>
                 </div>
                 <div className="model-rate-row">
-                  <span>Costo Salida (Completion):</span>
+                  <span>Costo Salida (Completado):</span>
                   <span className="model-rate-val">{rate.out} / 1M tkn</span>
                 </div>
               </div>

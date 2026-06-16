@@ -127,6 +127,9 @@ create table public.usage_logs (
   tokens_prompt integer not null default 0,
   tokens_completion integer not null default 0,
   estimated_cost numeric(10,6) not null default 0.000000,
+  model_name text,
+  prompt_text text,
+  response_text text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -296,3 +299,10 @@ La base de datos SHALL forzar el aislamiento por tenant/user mediante políticas
 #### Scenario: Inserción de un número de WhatsApp que excede el límite
 - **WHEN** Un usuario intenta registrar un séptimo número de WhatsApp
 - **THEN** El trigger tr_check_max_whatsapp_numbers arroja una excepción de base de datos y rechaza la inserción.
+
+### Requirement: Almacenamiento de Tráfico y Metadatos de IA
+La tabla `usage_logs` SHALL almacenar la información detallada del tráfico de IA, incluyendo el modelo utilizado, el prompt y la respuesta.
+
+#### Scenario: Inserción de un log de consumo con detalles de tráfico de IA
+- **WHEN** El webhook de WhatsApp realiza una llamada exitosa a un LLM
+- **THEN** Se inserta una fila en `usage_logs` conteniendo `provider`, `model_name`, `prompt_text`, `response_text`, tokens e `estimated_cost`.

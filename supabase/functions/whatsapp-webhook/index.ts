@@ -741,7 +741,10 @@ serve(async (req) => {
             provider: connData.provider,
             tokens_prompt: tokensPrompt,
             tokens_completion: tokensCompletion,
-            estimated_cost: estimatedCost
+            estimated_cost: estimatedCost,
+            model_name: modelName || connData.provider,
+            prompt_text: JSON.stringify(messagesPayload),
+            response_text: responseText
           })
           console.log("[OK] Uso de tokens y costo financiero registrado correctamente.");
         } else {
