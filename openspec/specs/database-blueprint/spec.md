@@ -31,10 +31,11 @@ create table public.profiles (
 create table public.ai_connections (
   id uuid default uuid_generate_v4() primary key,
   user_id uuid references public.profiles(id) on delete cascade not null,
-  provider text not null check (provider in ('openai', 'gemini', 'groq', 'claude')),
+  provider text not null check (provider in ('openai', 'gemini', 'groq', 'claude', 'deepseek', 'openrouter')),
   api_key text not null, -- Almacenada de forma enmascarada o cifrada
   nickname text not null,
   is_active boolean default true not null,
+  default_model text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -195,7 +196,7 @@ CREATE OR REPLACE FUNCTION public.encrypt_api_key_trigger()
 RETURNS trigger AS $$
 BEGIN
   IF TG_OP = 'INSERT' OR (NEW.api_key <> OLD.api_key) THEN
-    IF NEW.api_key NOT LIKE 'hQ%' AND NEW.api_key NOT LIKE 'y2h%' THEN
+    IF NEW.api_key NOT LIKE 'hQ%' AND NEW.api_key NOT LIKE 'y2h%' AND NEW.api_key NOT LIKE 'ww0E%' THEN
       NEW.api_key := encode(extensions.pgp_sym_encrypt(NEW.api_key, 'super-secret-vault-key-123'), 'base64');
     END IF;
   END IF;

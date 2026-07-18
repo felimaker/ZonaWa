@@ -457,6 +457,160 @@ label {
 .auth-tab.active { background: var(--primary); color: #fff; }
 .auth-form { display: flex; flex-direction: column; gap: 4px; }
 
+/* Estilos para login de Google, Recuperación y Cambios de Contraseña */
+.form-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.forgot-password-link {
+  background: none;
+  border: none;
+  font-size: 0.75rem;
+  color: var(--primary);
+  cursor: pointer;
+  padding: 0;
+  transition: opacity var(--duration) var(--ease);
+}
+.forgot-password-link:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+.auth-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: var(--text-2);
+  font-size: 0.75rem;
+  margin: 16px 0;
+}
+.auth-divider::before, .auth-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--border-glass);
+}
+.auth-divider:not(:empty)::before {
+  margin-right: .5em;
+}
+.auth-divider:not(:empty)::after {
+  margin-left: .5em;
+}
+.google-login-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-glass);
+  color: var(--text-1);
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 500;
+  width: 100%;
+  transition: all var(--duration) var(--ease);
+}
+.google-login-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(99, 102, 241, 0.3);
+  transform: translateY(-1px);
+}
+.google-icon {
+  flex-shrink: 0;
+}
+.auth-back-link {
+  display: block;
+  width: 100%;
+  text-align: center;
+  background: none;
+  border: none;
+  font-size: 0.85rem;
+  color: var(--text-2);
+  cursor: pointer;
+  margin-top: 20px;
+  transition: color var(--duration) var(--ease);
+}
+.auth-back-link:hover {
+  color: var(--text-1);
+}
+.auth-section-header {
+  margin-bottom: 20px;
+  text-align: center;
+}
+.auth-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-1);
+  margin-bottom: 6px;
+}
+.auth-section-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-2);
+  line-height: 1.4;
+}
+
+/* Banner de advertencia de perfil incompleto */
+.profile-warning-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  background: rgba(245, 158, 11, 0.08); /* Ámbar translúcido */
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  margin-bottom: 24px;
+  padding: 16px 24px;
+  border-radius: var(--radius-md);
+  transition: all var(--duration) var(--ease);
+}
+.profile-warning-banner:hover {
+  transform: translateY(-1px);
+  border-color: rgba(245, 158, 11, 0.3);
+  box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.3);
+}
+.banner-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.banner-icon {
+  color: var(--warning);
+  flex-shrink: 0;
+}
+.banner-content h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-1);
+  margin: 0 0 4px 0;
+}
+.banner-content p {
+  font-size: 0.825rem;
+  color: var(--text-2);
+  margin: 0;
+}
+.banner-action-btn {
+  text-decoration: none;
+  font-size: 0.85rem;
+  padding: 8px 16px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .profile-warning-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .banner-action-btn {
+    width: 100%;
+    text-align: center;
+  }
+}
+
 /* ═══════════════════════════════════════════
    METRIC CARDS
 ══════════════════════════════════════════ */

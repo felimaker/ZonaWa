@@ -114,78 +114,19 @@ Si se crea una nueva tabla, es obligatorio:
 
 ## 5. Historial de Migraciones del Proyecto
 
-### Migración v1.2.0 - Activadores Avanzados y Filtros de Destinatarios
-- **Fecha:** 2026-06-04
-- **Propósito:** Agregar columnas a la tabla `bot_configurations` para permitir al usuario configurar cómo se evalúan las palabras clave de activación y a qué remitentes debe responder el bot.
-- **Script SQL (Ejecutar en Supabase SQL Editor):**
-  ```sql
-  ALTER TABLE public.bot_configurations
-  ADD COLUMN trigger_mode text DEFAULT 'all' CHECK (trigger_mode IN ('all', 'exact', 'contains')) NOT NULL,
-  ADD COLUMN respond_saved_contacts boolean DEFAULT true NOT NULL,
-  ADD COLUMN unsaved_contacts_action text DEFAULT 'respond' CHECK (unsaved_contacts_action IN ('respond', 'ignore', 'fallback')) NOT NULL;
-  ```
-- **Rollback SQL:**
-  ```sql
-  ALTER TABLE public.bot_configurations
-  DROP COLUMN trigger_mode,
-  DROP COLUMN respond_saved_contacts,
-  DROP COLUMN unsaved_contacts_action;
-  ```
-
-### Migración v1.3.0 - Modelo Dinámico de IA, Costos y Reglas de Agente
-- **Fecha:** 2026-06-04
-- **Propósito:** Agregar columnas de modelo dinámico y reglas en la tabla `agents` y optimizar la cantidad máxima de tokens por defecto.
-- **Script SQL (Ejecutar en Supabase SQL Editor):**
-  ```sql
-  ALTER TABLE public.agents ADD COLUMN model text DEFAULT 'gpt-4o-mini' NOT NULL;
-  ALTER TABLE public.agents ADD COLUMN rules jsonb DEFAULT '[]'::jsonb NOT NULL;
-  ALTER TABLE public.agents ALTER COLUMN max_tokens SET DEFAULT 300;
-  ```
-- **Rollback SQL:**
-  ```sql
-  ALTER TABLE public.agents DROP COLUMN model;
-  ALTER TABLE public.agents DROP COLUMN rules;
-  ALTER TABLE public.agents ALTER COLUMN max_tokens SET DEFAULT 1000;
-  ```
-
-### Migración v1.4.0 - Reglas de Control Avanzadas de Bot en Chat
-- **Fecha:** 2026-06-05
-- **Propósito:** Agregar columnas `inactivity_wait_minutes`, `stop_trigger`, y `bot_trigger` a la tabla `bot_configurations` para soportar retomar la conversación por inactividad y triggers de pausa/activación en chat.
-- **Script SQL (Ejecutar en Supabase SQL Editor):**
-  ```sql
-  ALTER TABLE public.bot_configurations
-  ADD COLUMN inactivity_wait_minutes integer DEFAULT 0 CHECK (inactivity_wait_minutes >= 0) NOT NULL,
-  ADD COLUMN stop_trigger text DEFAULT 'stop' NOT NULL,
-  ADD COLUMN bot_trigger text DEFAULT 'bot' NOT NULL;
-  ```
-- **Rollback SQL:**
-  ```sql
-  ALTER TABLE public.bot_configurations
-  DROP COLUMN inactivity_wait_minutes,
-  DROP COLUMN stop_trigger,
-  DROP COLUMN bot_trigger;
-  ```
-
-### Migración v1.5.0 - Continuar IA tras Mensaje Manual y Habilitación de Realtime
-- **Fecha:** 2026-06-15
-- **Propósito:** Agregar columna `continue_ai_after_manual` a la tabla `bot_configurations` para controlar si el bot continúa respondiendo tras un mensaje manual, y habilitar la publicación en tiempo real de Supabase (`supabase_realtime`) para las tablas clave.
-- **Script SQL (Ejecutar en Supabase SQL Editor):**
-  ```sql
-  ALTER TABLE public.bot_configurations
-  ADD COLUMN continue_ai_after_manual BOOLEAN DEFAULT false NOT NULL;
-
-  ALTER PUBLICATION supabase_realtime ADD TABLE public.conversations;
-  ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
-  ALTER PUBLICATION supabase_realtime ADD TABLE public.usage_logs;
-  ```
-- **Rollback SQL:**
-  ```sql
-  ALTER TABLE public.bot_configurations DROP COLUMN continue_ai_after_manual;
-
-  ALTER PUBLICATION supabase_realtime DROP TABLE public.conversations;
-  ALTER PUBLICATION supabase_realtime DROP TABLE public.messages;
-  ALTER PUBLICATION supabase_realtime DROP TABLE public.usage_logs;
-  ```
+### Migración v1.0.0 - Consolidación del Esquema Canónico Base
+- **Fecha:** 2026-07-17
+- **Propósito:** Consolidar todas las tablas, columnas, funciones, triggers, políticas de RLS, cifrado de llaves de API y configuración de tiempo real (Realtime) en un único archivo de migración inicial (`20260604055430_remote_schema.sql`) para proveer un entorno de base de datos consistente y reproducible desde el primer día.
+- **Detalle de la consolidación:**
+  * Estructura base de 9 tablas (`profiles`, `ai_connections`, `whatsapp_numbers`, `agents`, `bot_configurations`, `conversations`, `messages`, `usage_logs`, `audit_logs`).
+  * Columna `default_model` añadida a `ai_connections`.
+  * Proveedores `deepseek` y `openrouter` añadidos al control de restricciones de `ai_connections`.
+  * Columnas `inactivity_wait_minutes`, `stop_trigger`, `bot_trigger` y `continue_ai_after_manual` añadidas a `bot_configurations`.
+  * Columna `webhook_secret` añadida a `whatsapp_numbers`.
+  * Columnas `model_name`, `prompt_text` y `response_text` añadidas a `usage_logs`.
+  * Función de cifrado automático de API Keys (`encrypt_api_key_trigger`) con el parche anti-doble-cifrado para claves que inicien con el prefijo `ww0E`.
+  * Publicación `supabase_realtime` configurada e inicializada para las tablas `whatsapp_numbers`, `conversations`, `messages` y `usage_logs`.
+  * Trigger de sincronización de perfiles `on_auth_user_created` para copiar nuevos usuarios creados desde Supabase Auth a `profiles`.
 
 ## Requirements
 ### Requirement: Inmutabilidad de las Migraciones Ejecutadas

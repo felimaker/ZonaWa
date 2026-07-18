@@ -68,6 +68,16 @@ Para cumplir con el estándar de seguridad y privacidad:
 * **No Logs de Credenciales:** Los logs de auditoría (`audit_logs`) o de llamadas API **nunca** deben capturar el contenido del campo `api_key` o las cabeceras `Authorization` en texto plano.
 * **Filtrado de Prompts:** Los prompts del sistema configurados por el usuario se validan antes de guardarse para asegurar que no contengan instrucciones maliciosas o inyecciones de código que puedan comprometer la API.
 
+---
+
+## 4. Google Login e Identidad Unificada (Vincular Cuentas)
+
+Para agilizar el registro e inicio de sesión, se implementa inicio de sesión social con Google OAuth y vinculación automática:
+* **Identidad Unificada:** Si un usuario se registra con email y contraseña, y posteriormente inicia sesión con Google usando el mismo email (o viceversa), Supabase Auth vinculará automáticamente ambas identidades al mismo ID de usuario.
+* **Flujo de Recuperación/Definición de Contraseña:** Un usuario que se registre a través de Google no tendrá contraseña local asignada. Si posteriormente intenta ingresar mediante credenciales clásicas, la aplicación le ofrecerá un flujo para definir su contraseña de forma segura mediante un correo de restablecimiento de contraseña.
+
+---
+
 ## Requirements
 ### Requirement: Protección de Credenciales de IA
 La plataforma SHALL enmascarar las llaves de API (API Keys) de IA en el cliente para evitar la filtración de credenciales.
@@ -75,3 +85,18 @@ La plataforma SHALL enmascarar las llaves de API (API Keys) de IA en el cliente 
 #### Scenario: Consulta de conexiones de IA registradas
 - **WHEN** El frontend solicita el listado de conexiones de IA de un usuario
 - **THEN** La respuesta de la base de datos no retorna la API Key descifrada y el frontend la muestra enmascarada como "••••••••••••••••".
+
+### Requirement: Autenticación Social y Vinculación por Email
+La plataforma SHALL permitir inicio de sesión clásico y mediante Google OAuth, unificando de forma segura ambas credenciales bajo la misma cuenta cuando compartan el mismo email verificado.
+
+#### Scenario: Inicio de sesión con Google usando un email ya registrado con contraseña
+- **WHEN** El usuario inicia sesión con Google OAuth usando un correo registrado previamente en el sistema
+- **THEN** Supabase asocia la identidad social a la cuenta existente, inicia sesión y carga el perfil unificado del usuario.
+
+### Requirement: Recuperación de Acceso de Cuentas OAuth
+La plataforma SHALL ofrecer un flujo de recuperación de contraseña para permitir que usuarios creados originalmente vía Google OAuth puedan establecer una contraseña local e iniciar sesión con credenciales clásicas.
+
+#### Scenario: Usuario OAuth define contraseña
+- **WHEN** El usuario solicita el restablecimiento de contraseña e ingresa su correo de Google, y sigue el enlace recibido
+- **THEN** La plataforma le permite definir una contraseña local, habilitando el acceso por credenciales y conservando el acceso por Google.
+

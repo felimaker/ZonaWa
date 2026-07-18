@@ -23,6 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 
+# Documents
+
 # Supabase temp config
 supabase/.temp/
 

@@ -32,16 +32,31 @@ export function AuthProvider({ children }) {
         .eq('id', userId)
         .maybeSingle()
 
+      if (error) console.error('Error fetching profile from DB:', error)
+
       if (data) {
         setProfile(data)
       } else {
         // Self-healing: if profile doesn't exist, create it from auth session metadata
         const { data: { session } } = await supabase.auth.getSession()
         const authUser = session?.user
+        const meta = authUser?.user_metadata
+        
+        // Mapeo inteligente para Google OAuth y Email/Password
+        const firstName = meta?.first_name || 
+                          meta?.given_name || 
+                          meta?.full_name?.split(' ')[0] || 
+                          authUser?.email?.split('@')[0] || 
+                          'Usuario';
+        const lastName = meta?.last_name || 
+                         meta?.family_name || 
+                         meta?.full_name?.split(' ').slice(1).join(' ') || 
+                         '';
+
         const newProfile = {
           id: userId,
-          first_name: authUser?.user_metadata?.first_name || authUser?.email?.split('@')[0] || 'Usuario',
-          last_name: authUser?.user_metadata?.last_name || '',
+          first_name: firstName,
+          last_name: lastName,
           timezone: 'UTC'
         }
         const { data: inserted, error: insertErr } = await supabase
@@ -80,6 +95,29 @@ export function AuthProvider({ children }) {
     return data
   }
 
+  async function signInWithGoogle() {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + '/dashboard'
+      }
+    })
+    if (error) throw error
+    return data
+  }
+
+  async function resetPassword(email) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/auth?mode=update-password'
+    })
+    if (error) throw error
+  }
+
+  async function updatePassword(newPassword) {
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (error) throw error
+  }
+
   async function signOut() {
     await supabase.auth.signOut()
   }
@@ -97,7 +135,10 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, updateProfile }}>
+    <AuthContext.Provider value={{ 
+      user, profile, loading, signUp, signIn, signInWithGoogle, 
+      resetPassword, updatePassword, signOut, updateProfile 
+    }}>
       {children}
     </AuthContext.Provider>
   )

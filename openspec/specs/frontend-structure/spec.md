@@ -172,3 +172,18 @@ La interfaz de usuario SHALL adaptarse responsivamente ocultando el sidebar en p
 #### Scenario: Visualización de la interfaz en dispositivo móvil
 - **WHEN** El ancho de pantalla detectado por CSS es menor a 640px
 - **THEN** La barra lateral (.sidebar) se oculta y la barra de navegación inferior (.mobile-nav) se vuelve visible.
+
+### Requirement: Interfaz de Autenticación Social y Flujos de Recuperación
+El formulario de autenticación (`AuthForm.jsx`) SHALL integrar un botón para inicio de sesión con Google y vistas condicionales para solicitar la recuperación de contraseña y la actualización de la misma.
+
+#### Scenario: Visualización de login con Google y restablecimiento de contraseña
+- **WHEN** Un usuario carga la pantalla de autenticación en modo login o registro
+- **THEN** Se muestra un botón de "Entrar con Google" estilizado bajo la estética del sistema y un enlace para "Recuperar contraseña" que le redirige a la vista de recuperación.
+
+### Requirement: Alerta de Completitud de Perfil en Dashboard
+El Dashboard (`Dashboard.jsx`) SHALL mostrar un banner de advertencia si el usuario no ha completado sus detalles de perfil esenciales (teléfono y empresa), invitándole a ir al formulario de perfil.
+
+#### Scenario: Usuario ingresa con perfil incompleto
+- **WHEN** El usuario inicia sesión y carga el dashboard, pero su perfil no tiene guardados el teléfono o la empresa
+- **THEN** Se despliega un banner superior de advertencia estética con un botón de acción rápida que enlaza a "/profile".
+

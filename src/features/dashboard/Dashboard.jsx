@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import MetricCard from '../../components/MetricCard'
-import { DollarSign, MessageCircle, Bot, Zap, TrendingUp, Clock } from 'lucide-react'
+import { DollarSign, MessageCircle, Bot, Zap, TrendingUp, Clock, AlertTriangle } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 export default function Dashboard() {
@@ -162,6 +163,21 @@ export default function Dashboard() {
           <p className="page-subtitle">Resumen de tu plataforma ZonaWa</p>
         </div>
       </div>
+
+      {(!profile?.phone || !profile?.company_name) && (
+        <div className="glass-card profile-warning-banner">
+          <div className="banner-content">
+            <AlertTriangle className="banner-icon" size={24} />
+            <div>
+              <h3>Completa tu perfil</h3>
+              <p>Ingresa tu número de contacto y el nombre de tu empresa para habilitar todas las funciones del bot.</p>
+            </div>
+          </div>
+          <Link to="/profile" className="btn-primary banner-action-btn">
+            Completar Perfil →
+          </Link>
+        </div>
+      )}
 
       <div className="metrics-grid">
         <MetricCard icon={DollarSign} label="Costo del Mes" value={`$${stats.cost}`} sub="USD (tokens IA)" color="primary" />
