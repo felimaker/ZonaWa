@@ -202,7 +202,7 @@ begin
   if TG_OP = 'INSERT' or (NEW.api_key <> OLD.api_key) then
     -- Evitar re-cifrar si ya empieza por los prefijos de cifrado ('hQ', 'y2h', 'ww0E')
     if NEW.api_key not like 'hQ%' and NEW.api_key not like 'y2h%' and NEW.api_key not like 'ww0E%' then
-      NEW.api_key := encode(extensions.pgp_sym_encrypt(NEW.api_key, 'super-secret-vault-key-123'), 'base64');
+      NEW.api_key := encode(extensions.pgp_sym_encrypt(NEW.api_key, coalesce(nullif(current_setting('app.settings.encryption_key', true), ''), 'fallback-development-encryption-key')), 'base64');
     end if;
   end if;
   return new;
@@ -222,7 +222,7 @@ select
   provider,
   case 
     when user_id = auth.uid() or auth.role() = 'service_role' 
-      then extensions.pgp_sym_decrypt(decode(api_key, 'base64'), 'super-secret-vault-key-123')
+      then extensions.pgp_sym_decrypt(decode(api_key, 'base64'), coalesce(nullif(current_setting('app.settings.encryption_key', true), ''), 'fallback-development-encryption-key'))
     else '***'
   end as api_key,
   nickname,

@@ -197,7 +197,7 @@ RETURNS trigger AS $$
 BEGIN
   IF TG_OP = 'INSERT' OR (NEW.api_key <> OLD.api_key) THEN
     IF NEW.api_key NOT LIKE 'hQ%' AND NEW.api_key NOT LIKE 'y2h%' AND NEW.api_key NOT LIKE 'ww0E%' THEN
-      NEW.api_key := encode(extensions.pgp_sym_encrypt(NEW.api_key, 'super-secret-vault-key-123'), 'base64');
+      NEW.api_key := encode(extensions.pgp_sym_encrypt(NEW.api_key, coalesce(nullif(current_setting('app.settings.encryption_key', true), ''), 'fallback-development-encryption-key')), 'base64');
     END IF;
   END IF;
   RETURN NEW;
@@ -219,7 +219,7 @@ SELECT
   provider,
   CASE 
     WHEN user_id = auth.uid() OR auth.role() = 'service_role' 
-      THEN extensions.pgp_sym_decrypt(decode(api_key, 'base64'), 'super-secret-vault-key-123')
+      THEN extensions.pgp_sym_decrypt(decode(api_key, 'base64'), coalesce(nullif(current_setting('app.settings.encryption_key', true), ''), 'fallback-development-encryption-key'))
     ELSE '***'
   END AS api_key,
   nickname,
